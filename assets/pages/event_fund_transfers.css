@@ -1,0 +1,14 @@
+body.page-event-fund-transfers .event-transfer-note-v6{margin-bottom:16px;color:#475569}
+body.page-event-fund-transfers .event-transfer-stats-v6{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+body.page-event-fund-transfers .event-stat-card-v6,body.page-event-fund-transfers .event-transfer-form-card-v6,body.page-event-fund-transfers .event-transfer-balance-card-v6,body.page-event-fund-transfers .event-transfer-history-card-v6{border:1px solid #dbeafe;background:linear-gradient(180deg,#fff,#f8fbff)}
+body.page-event-fund-transfers .event-transfer-layout-v6{align-items:start}
+body.page-event-fund-transfers .event-transfer-head-v6{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+body.page-event-fund-transfers .event-transfer-head-v6 h2{margin:0}
+body.page-event-fund-transfers .event-transfer-form-v6{display:grid;gap:14px}
+body.page-event-fund-transfers .event-transfer-field-v6{display:grid;gap:8px}
+body.page-event-fund-transfers .event-direction-grid-v6{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+body.page-event-fund-transfers .event-direction-card-v6{display:flex;align-items:center;justify-content:center;border:1px solid #bfdbfe;border-radius:18px;background:#fff;padding:14px;font-weight:800;cursor:pointer}
+body.page-event-fund-transfers .event-direction-card-v6 input{margin-right:8px}
+body.page-event-fund-transfers .event-transfer-submit-v6{width:100%;justify-content:center;padding:14px 18px;font-size:16px}
+body.page-event-fund-transfers .event-transfer-history-card-v6{margin-top:18px}
+@media (max-width: 960px){body.page-event-fund-transfers .event-transfer-stats-v6{grid-template-columns:1fr}body.page-event-fund-transfers .event-direction-grid-v6{grid-template-columns:1fr}}

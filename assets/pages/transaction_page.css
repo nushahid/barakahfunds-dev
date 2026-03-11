@@ -1,0 +1,245 @@
+body.page-transaction-page .collect-card-v5{
+    max-width:980px;
+    margin:0 auto 24px;
+    border:1px solid #fed7aa;
+    background:linear-gradient(135deg,#ffffff,#fff7ed);
+}
+
+body.page-transaction-page .collect-search-wrap-v5{
+    display:grid;
+    gap:10px;
+}
+
+body.page-transaction-page .collect-search-row-v5{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 150px;
+    gap:10px;
+}
+
+body.page-transaction-page .collect-search-input-v5{
+    width:100%;
+}
+
+body.page-transaction-page .collect-search-btn-v5{
+    background:#fff;
+    color:#0f172a;
+    border:1px solid var(--border);
+}
+
+body.page-transaction-page .collect-add-btn-v5{
+    width:100%;
+}
+
+body.page-transaction-page .collect-results-v5{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+body.page-transaction-page .collect-donor-result-v5{
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:14px;
+    padding:16px 18px;
+    border:1px solid #fdba74;
+    border-radius:20px;
+    background:#fff;
+    color:#0f172a;
+    text-align:left;
+    cursor:pointer;
+}
+
+body.page-transaction-page .collect-donor-left-v5{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+
+body.page-transaction-page .collect-donor-left-v5 strong{
+    font-size:18px;
+}
+
+body.page-transaction-page .collect-donor-left-v5 small{
+    color:#64748b;
+}
+
+body.page-transaction-page .collect-donor-right-v5{
+    font-weight:700;
+    white-space:nowrap;
+}
+
+body.page-transaction-page .collect-selected-v5{
+    border:1px dashed #fdba74;
+    border-radius:20px;
+    padding:14px 16px;
+    background:#fffaf3;
+}
+
+body.page-transaction-page .collect-selected-name-v5{
+    font-size:18px;
+    font-weight:800;
+    margin-top:3px;
+}
+
+body.page-transaction-page .collect-selected-meta-v5{
+    color:#64748b;
+    margin-top:4px;
+}
+
+body.page-transaction-page .is-disabled{
+    opacity:.55;
+    pointer-events:none;
+}
+
+body.page-transaction-page .section-title{
+    font-size:16px;
+    font-weight:800;
+    margin:4px 0 8px;
+}
+
+body.page-transaction-page .collect-category-grid-v5{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+}
+
+body.page-transaction-page .collect-payment-row-v5{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:10px;
+}
+
+body.page-transaction-page .collect-card-option-v5{
+    display:block;
+    margin:0;
+}
+
+body.page-transaction-page .collect-card-option-v5 input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+}
+
+body.page-transaction-page .collect-card-pill-v5{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-height:96px;
+    padding:14px 10px;
+    border-radius:20px;
+    border:1px solid var(--border);
+    background:#fff;
+    text-align:center;
+    font-weight:800;
+    cursor:pointer;
+}
+
+body.page-transaction-page .collect-payment-option-v5 .collect-card-pill-v5{
+    min-height:82px;
+    padding:12px 8px;
+}
+
+body.page-transaction-page .collect-card-pill-v5 .icon{
+    font-size:24px;
+    line-height:1;
+}
+
+body.page-transaction-page .collect-card-option-v5 input:checked + .collect-card-pill-v5{
+    background:linear-gradient(135deg,#ff7a18,#f65d00);
+    border-color:#f65d00;
+    color:#fff;
+    box-shadow:0 12px 24px rgba(246,93,0,.18);
+}
+
+body.page-transaction-page .collect-conditional-v5.hidden{
+    display:none;
+}
+
+body.page-transaction-page .collect-amount-row-v5{
+    display:grid;
+    grid-template-columns:repeat(6,minmax(0,1fr));
+    gap:8px;
+}
+
+body.page-transaction-page .collect-mini-card-v5{
+    min-width:0;
+    padding:12px 8px;
+    border-radius:16px;
+    border:1px solid var(--border);
+    background:#fff;
+    font-weight:800;
+    cursor:pointer;
+}
+
+body.page-transaction-page .collect-date-notes-grid-v5{
+    display:grid;
+    grid-template-columns:220px minmax(0,1fr);
+    gap:12px;
+}
+
+body.page-transaction-page .collect-date-notes-grid-v5 > div{
+    min-width:0;
+}
+
+body.page-transaction-page input[type="date"]{
+    width:100%;
+    min-width:0;
+    box-sizing:border-box;
+}
+
+body.page-transaction-page .collect-toolbar-v5{
+    display:flex;
+    justify-content:center;
+    margin-top:18px;
+}
+
+@media (max-width: 960px){
+    body.page-transaction-page .collect-card-v5{
+        margin-bottom:84px;
+    }
+
+    body.page-transaction-page .collect-search-row-v5{
+        grid-template-columns:1fr 116px;
+    }
+
+    body.page-transaction-page .collect-donor-result-v5{
+        padding:14px 15px;
+    }
+
+    body.page-transaction-page .collect-donor-left-v5 strong{
+        font-size:16px;
+    }
+
+    body.page-transaction-page .collect-payment-row-v5{
+        grid-template-columns:repeat(5,minmax(0,1fr));
+        gap:6px;
+    }
+
+    body.page-transaction-page .collect-payment-option-v5 .collect-card-pill-v5{
+        min-height:76px;
+        font-size:12px;
+        padding:10px 4px;
+    }
+
+    body.page-transaction-page .collect-card-pill-v5 .icon{
+        font-size:20px;
+    }
+
+    body.page-transaction-page .collect-amount-row-v5{
+        grid-template-columns:repeat(6,minmax(0,1fr));
+        gap:6px;
+    }
+
+    body.page-transaction-page .collect-mini-card-v5{
+        font-size:12px;
+        padding:10px 4px;
+    }
+
+    body.page-transaction-page .collect-date-notes-grid-v5{
+        grid-template-columns:1fr;
+    }
+}

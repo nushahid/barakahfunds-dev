@@ -1,0 +1,26 @@
+body.page-transfer-requests .transfer-hero-grid-v6{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+body.page-transfer-requests .transfer-hero-card-v6{text-decoration:none;color:inherit;background:linear-gradient(135deg,#fff,#eff6ff);border:1px solid #dbeafe;border-radius:22px;padding:18px;box-shadow:0 12px 28px rgba(37,99,235,.08)}
+body.page-transfer-requests .transfer-hero-link-v6:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(37,99,235,.14)}
+body.page-transfer-requests .transfer-hero-label-v6{font-weight:800;color:#1e3a8a}
+body.page-transfer-requests .transfer-hero-value-v6{font-size:30px;font-weight:900;color:#111827;margin:10px 0 6px}
+body.page-transfer-requests .transfer-hero-note-v6{color:#64748b;font-size:13px}
+body.page-transfer-requests .transfer-layout-v6{align-items:start}
+body.page-transfer-requests .transfer-form-card-v6,body.page-transfer-requests .transfer-list-card-v6,body.page-transfer-requests .transfer-history-card-v6{border:1px solid #dbeafe;background:linear-gradient(180deg,#fff,#f8fbff)}
+body.page-transfer-requests .transfer-section-head-v6{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+body.page-transfer-requests .transfer-section-head-v6 h2{margin:0}
+body.page-transfer-requests .transfer-form-v6{display:grid;gap:14px}
+body.page-transfer-requests .transfer-field-v6{display:grid;gap:8px}
+body.page-transfer-requests .transfer-amount-grid-v6{display:grid;grid-template-columns:1fr;gap:12px}
+body.page-transfer-requests .transfer-choice-card-v6{display:grid;gap:8px;border:1px solid #bfdbfe;background:#fff;border-radius:18px;padding:14px}
+body.page-transfer-requests .transfer-choice-title-v6{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+body.page-transfer-requests .transfer-method-grid-v6{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+body.page-transfer-requests .transfer-method-card-v6{display:flex;align-items:center;justify-content:center;border:1px solid #bfdbfe;border-radius:18px;background:#fff;padding:14px;font-weight:800;cursor:pointer}
+body.page-transfer-requests .transfer-method-card-v6 input{margin-right:8px}
+body.page-transfer-requests .transfer-submit-btn-v6{width:100%;justify-content:center;padding:14px 18px;font-size:16px}
+body.page-transfer-requests .transfer-request-list-v6{display:flex;flex-direction:column;gap:12px}
+body.page-transfer-requests .transfer-request-item-v6{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px;border:1px solid #e2e8f0;border-radius:18px;background:#fff}
+body.page-transfer-requests .transfer-request-name-v6{font-weight:900;color:#111827}
+body.page-transfer-requests .transfer-request-actions-v6{text-align:right}
+body.page-transfer-requests .transfer-inline-form-v6{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+body.page-transfer-requests .transfer-history-card-v6{margin-top:18px}
+@media (max-width: 960px){body.page-transfer-requests .transfer-hero-grid-v6{grid-template-columns:1fr}body.page-transfer-requests .transfer-method-grid-v6{grid-template-columns:1fr}body.page-transfer-requests .transfer-request-item-v6{flex-direction:column;align-items:flex-start}body.page-transfer-requests .transfer-request-actions-v6{width:100%;text-align:left}body.page-transfer-requests .transfer-inline-form-v6{justify-content:flex-start}}

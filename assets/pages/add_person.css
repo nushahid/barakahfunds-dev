@@ -1,0 +1,117 @@
+body.page-add-person .main{
+    max-width:none;
+}
+
+body.page-add-person .donor-form-card-v5{
+    max-width:960px;
+    margin:0 auto 24px;
+    border:1px solid #fed7aa;
+    background:linear-gradient(135deg,#ffffff,#fff7ed);
+    border-radius:24px;
+    padding:20px;
+    box-shadow:0 14px 36px rgba(15,23,42,.08);
+}
+
+body.page-add-person .donor-form-v5{
+    gap:18px;
+}
+
+body.page-add-person .donor-main-grid-v5{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:16px;
+}
+
+body.page-add-person .donor-amount-suggestions-v5{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:8px;
+    margin-top:10px;
+}
+
+body.page-add-person .donor-amount-suggestions-v5 .btn{
+    min-width:0;
+    white-space:nowrap;
+}
+
+body.page-add-person .donor-payment-row-v5{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+}
+
+body.page-add-person .donor-payment-option-v5{
+    display:block;
+    margin:0;
+}
+
+body.page-add-person .donor-payment-option-v5 input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+}
+
+body.page-add-person .donor-payment-pill-v5{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-height:86px;
+    padding:14px 10px;
+    border:1px solid var(--border);
+    border-radius:18px;
+    background:#fff;
+    font-weight:700;
+    cursor:pointer;
+    text-align:center;
+    box-shadow:0 8px 18px rgba(15,23,42,.05);
+}
+
+body.page-add-person .donor-payment-icon-v5{
+    font-size:20px;
+    line-height:1;
+}
+
+body.page-add-person .donor-payment-option-v5 input:checked + .donor-payment-pill-v5{
+    background:linear-gradient(135deg,#f97316,#ea580c);
+    border-color:#ea580c;
+    color:#fff;
+    box-shadow:0 8px 18px rgba(249,115,22,.18);
+}
+
+@media (max-width: 960px){
+    body.page-add-person .donor-form-card-v5{
+        padding:16px;
+        border-radius:20px;
+    }
+
+    body.page-add-person .donor-main-grid-v5{
+        grid-template-columns:1fr;
+        gap:14px;
+    }
+
+    body.page-add-person .donor-amount-suggestions-v5{
+        grid-template-columns:repeat(4,minmax(0,1fr));
+    }
+
+    body.page-add-person .donor-payment-row-v5{
+        grid-template-columns:repeat(3,minmax(0,1fr));
+    }
+
+    body.page-add-person .donor-payment-pill-v5{
+        min-height:78px;
+        padding:12px 8px;
+        font-size:14px;
+    }
+
+    body.page-add-person .toolbar{
+        display:grid;
+        grid-template-columns:1fr;
+        gap:10px;
+    }
+
+    body.page-add-person .toolbar .btn{
+        width:100%;
+    }
+}

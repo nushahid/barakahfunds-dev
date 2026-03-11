@@ -1,0 +1,57 @@
+<?php
+require_once __DIR__ . '/includes/functions.php';
+startSecureSession();
+require_once __DIR__ . '/includes/db.php';
+
+if (isUserSessionValid($pdo)) {
+    header('Location: index.php');
+    exit;
+}
+
+$errors = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfOrFail();
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+
+    if ($username === '' || $password === '') {
+        $errors[] = 'Username and password are required.';
+    } else {
+        $result = verifyLogin($pdo, $username, $password);
+        if ($result['ok']) {
+            setFlash('success', 'Welcome back.');
+            header('Location: index.php');
+            exit;
+        }
+        $errors[] = $result['message'];
+    }
+}
+$flash = getFlash();
+?>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login - BarakahFunds</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="login-page">
+<div class="login-shell">
+    <div class="login-card">
+        <div class="brand brand-center">BarakahFunds</div>
+        <h1 class="title" style="margin-top:10px;">Secure Login</h1>
+        <p class="muted">Default admin login after patch: <strong>admin</strong> / <strong>ChangeMe123!</strong></p>
+        <?php if ($flash): ?><div class="alert <?= e($flash['type']) ?>"><?= e($flash['message']) ?></div><?php endif; ?>
+        <?php if ($errors): ?><div class="alert error"><?php foreach ($errors as $er): ?><div><?= e($er) ?></div><?php endforeach; ?></div><?php endif; ?>
+        <form method="post" class="stack">
+            <?= csrfField() ?>
+            <div><label for="username">Username</label><input type="text" name="username" id="username" autocomplete="username" required></div>
+            <div><label for="password">Password</label><input type="password" name="password" id="password" autocomplete="current-password" required></div>
+            <button class="btn btn-primary" type="submit">Log In</button>
+        </form>
+        <div class="helper" style="margin-top:12px;">MAC address locking is not reliable in a web app because browsers do not expose MAC addresses. This build uses enrolled-device cookies plus browser fingerprint checks instead.</div>
+    </div>
+</div>
+</body>
+</html>

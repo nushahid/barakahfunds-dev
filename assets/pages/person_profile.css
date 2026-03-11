@@ -1,0 +1,190 @@
+
+body.page-person-profile .person-profile-v5{
+    display:grid;
+    grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr);
+    gap:20px;
+    align-items:start;
+}
+
+body.page-person-profile .person-profile-main-v5,
+body.page-person-profile .person-profile-side-v5{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+}
+
+body.page-person-profile .person-hero-card-v5{
+    border:1px solid #fed7aa;
+    background:linear-gradient(135deg,#ffffff,#fff7ed);
+}
+
+body.page-person-profile .person-name-v5{
+    margin:0 0 4px;
+    font-size:30px;
+    line-height:1.1;
+}
+
+body.page-person-profile .person-badges-v5{
+    margin-top:14px;
+}
+
+body.page-person-profile .person-actions-v5{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+}
+
+body.page-person-profile .person-summary-grid-v5{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:14px;
+}
+
+body.page-person-profile .person-summary-card-v5{
+    border:1px solid #e5e7eb;
+}
+
+body.page-person-profile .section-head-v5{
+    margin:0 0 12px;
+    font-size:22px;
+}
+
+body.page-person-profile .person-info-grid-v5{
+    display:grid;
+    gap:10px;
+}
+
+body.page-person-profile .person-info-row-v5{
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    padding:12px 14px;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    background:#fff;
+}
+
+body.page-person-profile .person-info-row-v5 strong{
+    min-width:150px;
+}
+
+body.page-person-profile .qr-card-v5{
+    border:1px solid #bfdbfe;
+    background:linear-gradient(135deg,#ffffff,#eff6ff);
+}
+
+body.page-person-profile .qr-wrap-v5{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    margin-bottom:12px;
+}
+
+body.page-person-profile .qr-wrap-v5 img{
+    max-width:100%;
+    height:auto;
+    border-radius:18px;
+    border:1px solid #dbeafe;
+    background:#fff;
+}
+
+body.page-person-profile .public-link-box-v5{
+    margin-top:12px;
+    padding:12px 14px;
+    border:1px dashed #93c5fd;
+    border-radius:16px;
+    background:#fff;
+    word-break:break-all;
+}
+
+body.page-person-profile .desktop-activity-card-v5{
+    display:block;
+}
+
+body.page-person-profile .mobile-activity-card-v5{
+    display:none;
+}
+
+body.page-person-profile .mobile-activity-list-v5{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:12px;
+}
+
+body.page-person-profile .mobile-activity-item-v5{
+    padding:12px 14px;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    background:#fff;
+}
+
+body.page-person-profile .mobile-activity-top-v5{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:6px;
+}
+
+body.page-person-profile .mobile-activity-meta-v5,
+body.page-person-profile .mobile-activity-notes-v5{
+    margin-top:5px;
+    color:#475569;
+    word-break:break-word;
+}
+
+@media (max-width: 960px){
+    body.page-person-profile .person-profile-v5{
+        grid-template-columns:1fr;
+    }
+
+    body.page-person-profile .person-actions-v5{
+        display:grid;
+        grid-template-columns:1fr;
+    }
+
+    body.page-person-profile .person-actions-v5 .btn{
+        width:100%;
+    }
+
+    body.page-person-profile .person-summary-grid-v5{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+
+    body.page-person-profile .person-info-row-v5{
+        flex-direction:column;
+        gap:6px;
+        align-items:flex-start;
+    }
+
+    body.page-person-profile .desktop-activity-card-v5{
+        display:none;
+    }
+
+    body.page-person-profile .mobile-activity-card-v5{
+        display:block;
+    }
+}
+
+@media (max-width: 640px){
+    body.page-person-profile .person-name-v5{
+        font-size:24px;
+    }
+
+    body.page-person-profile .person-hero-top-v5{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:10px;
+    }
+
+    body.page-person-profile .person-summary-grid-v5{
+        grid-template-columns:1fr 1fr;
+        gap:10px;
+    }
+
+    body.page-person-profile .section-head-v5{
+        font-size:20px;
+    }
+}

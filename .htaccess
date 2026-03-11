@@ -1,0 +1,13 @@
+DirectoryIndex index.php
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://dev.barakahfunds.eu%{REQUEST_URI} [R=301,L]
+
+# Protect sensitive paths
+RewriteRule (^|/)\.git(/|$) - [F,L]
+<FilesMatch "^(wp-config\.php|composer\.(json|lock)|\.env)$">
+    Require all denied
+</FilesMatch>
+

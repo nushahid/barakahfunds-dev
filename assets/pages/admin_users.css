@@ -1,0 +1,19 @@
+
+.page-admin-users .admin-users-grid-v5{align-items:start}
+.page-admin-users .admin-user-actions{white-space:nowrap}
+.page-admin-users .admin-user-row-open td{background:#f8fbff}
+.page-admin-users .admin-inline-edit-wrap td{padding:0 !important;background:#f8fbff}
+.page-admin-users .admin-inline-card{padding:18px;border-top:1px solid #dde6f2}
+.page-admin-users .admin-link-box{padding:14px;border:1px solid #dbe5f0;border-radius:14px;background:#fff}
+.page-admin-users .admin-link-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.page-admin-users .admin-current-link{margin:8px 0 12px}
+.page-admin-users .admin-donor-search-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.page-admin-users .admin-donor-search-row input{flex:1;min-width:220px}
+.page-admin-users .admin-donor-results{display:grid;gap:8px;margin-top:10px}
+.page-admin-users .admin-donor-result{display:block;padding:12px 14px;border:1px solid #d7e0ec;border-radius:12px;cursor:pointer;background:#fafcff}
+.page-admin-users .admin-donor-result input{margin-right:10px}
+.page-admin-users .admin-donor-result span{display:flex;flex-direction:column;gap:3px}
+.page-admin-users .admin-donor-result.is-active{border-color:#0f6fff;box-shadow:0 0 0 3px rgba(15,111,255,.1);background:#eef5ff}
+.page-admin-users .admin-inline-actions{display:flex;gap:10px;flex-wrap:wrap}
+.page-admin-users .inline-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.page-admin-users .inline-grid-3{grid-template-columns:1fr}}
