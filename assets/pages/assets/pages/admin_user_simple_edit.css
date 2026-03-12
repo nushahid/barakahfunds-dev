@@ -1,0 +1,15 @@
+/* Admin Simple User Edit */
+
+.simple-user-edit {
+max-width: 600px;
+}
+
+.simple-user-edit form {
+display: grid;
+gap: 10px;
+}
+
+.simple-user-edit input,
+.simple-user-edit select {
+padding: 6px;
+}

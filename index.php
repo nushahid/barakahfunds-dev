@@ -57,7 +57,7 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 <div class="grid-2 ledger-grid" style="margin-top:24px;">
   <div class="card">
-    <div class="toolbar"><h2 style="margin:0">Monthly Collected Amount</h2><span class="tag blue"><?= e(currentMonthLabel()) ?></span></div>
+    <div class="toolbar dashboard-toolbar"><h2 class="dashboard-section-title">Monthly Collected Amount</h2><span class="tag blue"><?= e(currentMonthLabel()) ?></span></div>
     <div class="chart-shell">
       <?php $max = max(1, ...array_values($dailySeries)); foreach ($dailySeries as $date => $amount): $height = max(8, (int)round(($amount / $max) * 180)); ?>
         <div class="chart-bar-wrap">
@@ -70,16 +70,16 @@ require_once __DIR__ . '/includes/header.php';
   </div>
   <div class="stack">
     <div class="card">
-      <div class="toolbar"><h2 style="margin:0">Collection by Payment Method</h2></div>
-      <div class="stack compact">
+      <div class="toolbar dashboard-toolbar"><h2 class="dashboard-section-title">Collection by Payment Method</h2></div>
+      <div class="stack compact dashboard-method-list">
         <?php foreach ($methodTotals as $method => $total): ?>
-          <div class="meter-row"><div><strong><?= e($method === 'bank_manual' ? 'Bank' : ($method === 'cash_manual' ? 'Cash' : ucwords(str_replace('_', ' ', $method)))) ?></strong></div><div><?= money((float)$total) ?></div></div>
+          <div class="meter-row dashboard-method-row"><div class="dashboard-method-label"><strong><?= e($method === 'bank_manual' ? 'Bank' : ($method === 'cash_manual' ? 'Cash' : ucwords(str_replace('_', ' ', $method)))) ?></strong></div><div class="dashboard-method-value"><?= money((float)$total) ?></div></div>
         <?php endforeach; ?>
       </div>
     </div>
     <div class="card">
-      <div class="toolbar"><h2 style="margin:0">Previous Month Online Report</h2><span class="tag orange"><?= e(previousMonthLabel()) ?></span></div>
-      <div class="summary"><?= money($previousStripe) ?></div>
+      <div class="toolbar dashboard-toolbar"><h2 class="dashboard-section-title">Previous Month Online Report</h2><span class="tag orange"><?= e(previousMonthLabel()) ?></span></div>
+      <div class="summary dashboard-online-value"><?= money($previousStripe) ?></div>
       <div class="muted">Accountant posts all successful Stripe monthly payments from the previous month and leaves failed ones suspended.</div>
     </div>
   </div>
@@ -104,7 +104,7 @@ require_once __DIR__ . '/includes/header.php';
     </div>
   </div>
   <div class="card dashboard-events-card">
-    <div class="toolbar dashboard-toolbar-wrap"><h2 style="margin:0">Active Events</h2><a class="btn" href="event_page.php"><?= $isFinanceDashboard ? 'View Events' : 'Manage Events' ?></a></div>
+    <div class="toolbar dashboard-toolbar-wrap"><h2 class="dashboard-section-title">Active Events</h2><?php if ($isFinanceDashboard): ?><a class="btn" href="event_page.php">View Events</a><?php endif; ?></div>
     <div class="stack compact dashboard-events-list dashboard-events-list-v5">
       <?php foreach ($events as $event): ?>
         <div class="meter-row dashboard-event-row">

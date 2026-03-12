@@ -1,0 +1,33 @@
+/* Custom styles to complement Tailwind */
+:root {
+    --primary: #c7a86a; /* Barakah Gold */
+    --dark: #0f172a;
+}
+
+body {
+    background-color: #f8fafc;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Hide scrollbars for a clean app feel */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+/* Mobile Downbar Shadow */
+.mobile-nav-shadow {
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Action Button Glow */
+.fab-glow {
+    box-shadow: 0 4px 15px rgba(199, 168, 106, 0.4);
+}
+
+/* Responsive visibility */
+@media (min-width: 1024px) {
+    .mobile-only { display: none; }
+}
+@media (max-width: 1023px) {
+    .desktop-only { display: none; }
+}
+

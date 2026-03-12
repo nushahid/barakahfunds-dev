@@ -1,0 +1,9 @@
+.page-expense-categories .card{overflow:hidden}
+.page-expense-categories .toolbar .btn{white-space:nowrap}
+.page-expense-categories .expense-category-subtitle{margin:0}
+.page-expense-categories .expense-status-group{grid-template-columns:repeat(2,minmax(0,1fr))}
+.page-expense-categories .expense-category-row{text-decoration:none}
+@media (max-width: 960px){
+  .page-expense-categories .expense-category-row{display:block}
+  .page-expense-categories .expense-category-row .compact-actions{margin-top:12px}
+}

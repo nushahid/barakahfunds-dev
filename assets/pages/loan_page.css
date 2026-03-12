@@ -1,0 +1,6 @@
+.page-loan-page .loan-subtitle{margin:0}
+.page-loan-page .loan-layout{align-items:start}
+.page-loan-page .loan-form-card{position:sticky;top:16px}
+@media (max-width: 960px){
+  .page-loan-page .loan-form-card{position:static}
+}

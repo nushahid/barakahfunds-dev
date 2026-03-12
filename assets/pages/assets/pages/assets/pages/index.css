@@ -1,0 +1,20 @@
+/* Dashboard Page */
+
+.dashboard-cards {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+gap: 15px;
+}
+
+.dashboard-card {
+padding: 15px;
+}
+
+.dashboard-card h3 {
+margin-bottom: 5px;
+}
+
+.dashboard-card .amount {
+font-size: 20px;
+font-weight: bold;
+}

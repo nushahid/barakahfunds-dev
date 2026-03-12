@@ -4,6 +4,12 @@ function setAmount(targetId, value){
   const current=parseFloat(input.value||'0');
   input.value=(current+value).toFixed(2);
 }
+function fillAmount(targetId, value){
+  const input=document.getElementById(targetId);
+  if(!input) return;
+  input.value=parseFloat(value).toFixed(2);
+  input.dispatchEvent(new Event('input', { bubbles:true }));
+}
 function filterPeople(inputId, rowClass){
   const q=(document.getElementById(inputId)?.value||'').toLowerCase();
   document.querySelectorAll('.'+rowClass).forEach(row=>{
@@ -29,8 +35,16 @@ function toggleSidebar(force){
 function isMobileSidebarModeDisabled(){
   return window.matchMedia('(max-width: 960px)').matches;
 }
+function getStoredSidebarMode(){
+  let mode = localStorage.getItem('sidebar_mode');
+  if (!mode) {
+    mode = isMobileSidebarModeDisabled() ? 'full' : 'icons';
+    localStorage.setItem('sidebar_mode', mode);
+  }
+  return mode;
+}
 function applySidebarMode(){
-  const compactStored = localStorage.getItem('sidebar_mode') === 'icons';
+  const compactStored = getStoredSidebarMode() === 'icons';
   const compact = !isMobileSidebarModeDisabled() && compactStored;
   document.body.classList.toggle('sidebar-icons-only', compact);
   const toggleButtons = document.querySelectorAll('.sidebar-mode-btn');
@@ -39,7 +53,7 @@ function applySidebarMode(){
 }
 function toggleSidebarMode(){
   if (isMobileSidebarModeDisabled()) return;
-  const compact = localStorage.getItem('sidebar_mode') === 'icons';
+  const compact = getStoredSidebarMode() === 'icons';
   localStorage.setItem('sidebar_mode', compact ? 'full' : 'icons');
   applySidebarMode();
 }
