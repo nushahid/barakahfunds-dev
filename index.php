@@ -42,9 +42,11 @@ $events = activeEventsSummary($pdo);
 require_once __DIR__ . '/includes/header.php';
 ?>
 <h1 class="title">Dashboard</h1>
-<div class="muted" style="margin-bottom:18px;">Current month overview for <?= e(currentMonthLabel()) ?>. Stripe reconciliation is posted in the following month, so the online card below uses <strong><?= e(previousMonthLabel()) ?></strong>.</div>
-<div class="grid-3 dashboard-cards" style="margin-bottom:24px;">
+<div class="muted dashboard-intro">Current month overview for <?= e(currentMonthLabel()) ?>. Stripe reconciliation is posted in the following month, so the online card below uses <strong><?= e(previousMonthLabel()) ?></strong>.</div>
+
+<div class="dashboard-cards">
   <?php $cardIndex = 0; foreach ($cards as $label => $value): ?>
+    <?php if ($value === null || $value === '') continue; ?>
     <?php $cardIndex++; ?>
     <div class="card stat-card dashboard-card dashboard-card-<?= (int)$cardIndex ?> dashboard-card-role-<?= e($role) ?>">
       <div class="dashboard-card-label"><?= e($label) ?></div>
@@ -55,9 +57,13 @@ require_once __DIR__ . '/includes/header.php';
     </div>
   <?php endforeach; ?>
 </div>
-<div class="grid-2 ledger-grid" style="margin-top:24px;">
+
+<div class="grid-2 ledger-grid dashboard-ledger-grid">
   <div class="card">
-    <div class="toolbar dashboard-toolbar"><h2 class="dashboard-section-title">Monthly Collected Amount</h2><span class="tag blue"><?= e(currentMonthLabel()) ?></span></div>
+    <div class="toolbar dashboard-toolbar">
+      <h2 class="dashboard-section-title">Monthly Collected Amount</h2>
+      <span class="tag blue"><?= e(currentMonthLabel()) ?></span>
+    </div>
     <div class="chart-shell">
       <?php $max = max(1, ...array_values($dailySeries)); foreach ($dailySeries as $date => $amount): $height = max(8, (int)round(($amount / $max) * 180)); ?>
         <div class="chart-bar-wrap">
@@ -68,43 +74,66 @@ require_once __DIR__ . '/includes/header.php';
       <?php endforeach; ?>
     </div>
   </div>
+
   <div class="stack">
     <div class="card">
-      <div class="toolbar dashboard-toolbar"><h2 class="dashboard-section-title">Collection by Payment Method</h2></div>
-      <div class="stack compact dashboard-method-list">
+      <div class="toolbar dashboard-toolbar">
+        <h2 class="dashboard-section-title">Collection by Payment Method</h2>
+      </div>
+      <div class="stack compact">
         <?php foreach ($methodTotals as $method => $total): ?>
-          <div class="meter-row dashboard-method-row"><div class="dashboard-method-label"><strong><?= e($method === 'bank_manual' ? 'Bank' : ($method === 'cash_manual' ? 'Cash' : ucwords(str_replace('_', ' ', $method)))) ?></strong></div><div class="dashboard-method-value"><?= money((float)$total) ?></div></div>
+          <div class="meter-row dashboard-method-row">
+            <div class="dashboard-method-label">
+              <strong><?= e($method === 'bank_manual' ? 'Bank' : ($method === 'cash_manual' ? 'Cash' : ucwords(str_replace('_', ' ', $method)))) ?></strong>
+            </div>
+            <div class="dashboard-method-value"><?= money((float)$total) ?></div>
+          </div>
         <?php endforeach; ?>
       </div>
     </div>
+
     <div class="card">
-      <div class="toolbar dashboard-toolbar"><h2 class="dashboard-section-title">Previous Month Online Report</h2><span class="tag orange"><?= e(previousMonthLabel()) ?></span></div>
+      <div class="toolbar dashboard-toolbar">
+        <h2 class="dashboard-section-title">Previous Month Online Report</h2>
+        <span class="tag orange"><?= e(previousMonthLabel()) ?></span>
+      </div>
       <div class="summary dashboard-online-value"><?= money($previousStripe) ?></div>
       <div class="muted">Accountant posts all successful Stripe monthly payments from the previous month and leaves failed ones suspended.</div>
     </div>
   </div>
 </div>
-<div class="grid-2" style="margin-top:24px;">
+
+<div class="grid-2 dashboard-bottom-grid">
   <div class="card dashboard-recent-activity dashboard-recent-activity-v5">
-    <div class="toolbar"><h2 style="margin:0">Recent Activity</h2><?php if ($role !== 'operator'): ?><a class="btn" href="accounts_report.php">Open Accounts Report</a><?php endif; ?></div>
+    <div class="toolbar dashboard-toolbar">
+      <h2 class="dashboard-section-title">Recent Activity</h2>
+      <?php if ($role !== 'operator'): ?><a class="btn" href="accounts_report.php">Open Accounts Report</a><?php endif; ?>
+    </div>
     <div class="table-wrap">
-      <table><thead><tr><th>Date</th><th>Category</th><th>Person</th><th>Operator</th><th>Method</th><th>Amount</th></tr></thead><tbody>
-      <?php foreach ($recentRows as $row): ?>
-        <tr>
-          <td><?= e((string)$row['created_at']) ?></td>
-          <td><span class="tag orange"><?= e((string)$row['transaction_category']) ?></span></td>
-          <td><?= e((string)($row['person_name'] ?: '—')) ?></td>
-          <td><?= e((string)($row['operator_name'] ?: '—')) ?></td>
-          <td><?= e((string)$row['payment_method'] === 'bank_manual' ? 'Bank' : ((string)$row['payment_method'] === 'cash_manual' ? 'Cash' : ucwords(str_replace('_', ' ', (string)$row['payment_method'])))) ?></td>
-          <td><?= money((float)$row['amount']) ?></td>
-        </tr>
-      <?php endforeach; ?>
-      <?php if (!$recentRows): ?><tr><td colspan="6" class="muted">No activity available yet.</td></tr><?php endif; ?>
-      </tbody></table>
+      <table>
+        <thead><tr><th>Date</th><th>Category</th><th>Person</th><th>Operator</th><th>Method</th><th>Amount</th></tr></thead>
+        <tbody>
+        <?php foreach ($recentRows as $row): ?>
+          <tr>
+            <td><?= e((string)$row['created_at']) ?></td>
+            <td><span class="tag orange"><?= e((string)$row['transaction_category']) ?></span></td>
+            <td><?= e((string)($row['person_name'] ?: '—')) ?></td>
+            <td><?= e((string)($row['operator_name'] ?: '—')) ?></td>
+            <td><?= e((string)$row['payment_method'] === 'bank_manual' ? 'Bank' : ((string)$row['payment_method'] === 'cash_manual' ? 'Cash' : ucwords(str_replace('_', ' ', (string)$row['payment_method'])))) ?></td>
+            <td><?= money((float)$row['amount']) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        <?php if (!$recentRows): ?><tr><td colspan="6" class="muted">No activity available yet.</td></tr><?php endif; ?>
+        </tbody>
+      </table>
     </div>
   </div>
+
   <div class="card dashboard-events-card">
-    <div class="toolbar dashboard-toolbar-wrap"><h2 class="dashboard-section-title">Active Events</h2><?php if ($isFinanceDashboard): ?><a class="btn" href="event_page.php">View Events</a><?php endif; ?></div>
+    <div class="toolbar dashboard-toolbar-wrap">
+      <h2 class="dashboard-section-title">Active Events</h2>
+      <?php if ($isFinanceDashboard): ?><a class="btn" href="event_page.php">View Events</a><?php endif; ?>
+    </div>
     <div class="stack compact dashboard-events-list dashboard-events-list-v5">
       <?php foreach ($events as $event): ?>
         <div class="meter-row dashboard-event-row">

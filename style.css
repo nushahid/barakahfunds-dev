@@ -98,12 +98,6 @@ body.sidebar-icons-only .main{max-width:calc(100vw - 88px)}body.sidebar-icons-on
 }
 
 
-/* Mobile quick bar: hidden on desktop, visible only on mobile */
 @media (min-width: 961px){
   .mobile-quickbar{display:none !important;}
-}
-@media (max-width: 960px){
-  .mobile-quickbar{display:grid !important;grid-template-columns:repeat(5,minmax(0,1fr)) !important;}
-  .quick-link{min-width:0;}
-  .quick-link small{font-size:11px !important;white-space:nowrap !important;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 }

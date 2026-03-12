@@ -1,0 +1,25 @@
+body.page-anonymous-collections .ac-form-card{max-width:980px;margin:0 auto 18px}
+body.page-anonymous-collections .ac-title,body.page-anonymous-collections .ac-subtitle{margin:0 0 14px}
+body.page-anonymous-collections .ac-big-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+body.page-anonymous-collections .ac-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body.page-anonymous-collections .ac-option-card input{display:none}
+body.page-anonymous-collections .cat-card-v5,
+body.page-anonymous-collections .ac-pay-chip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:86px;padding:14px;border:1px solid #d6deeb;border-radius:16px;background:#f8fbff;cursor:pointer;font-weight:700;text-align:center}
+body.page-anonymous-collections .ac-icon{font-size:24px;line-height:1}
+body.page-anonymous-collections .ac-option-card input:checked + .cat-card-v5,
+body.page-anonymous-collections .ac-option-card input:checked + .ac-pay-chip{border-color:#0f6fff;box-shadow:0 0 0 3px rgba(15,111,255,.12);background:#eef5ff}
+body.page-anonymous-collections .ac-hidden{display:none}
+body.page-anonymous-collections .ac-label{display:block;margin-bottom:6px;font-weight:600}
+body.page-anonymous-collections .ac-select,
+body.page-anonymous-collections .ac-textarea{width:100%}
+body.page-anonymous-collections .ac-quick-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+body.page-anonymous-collections .ac-save-btn{width:100%;min-height:48px;font-size:16px}
+body.page-anonymous-collections .ac-secondary-grid{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.1fr);gap:18px}
+body.page-anonymous-collections .ac-form-actions{display:flex;gap:10px;flex-wrap:wrap}
+@media (min-width:900px){
+  body.page-anonymous-collections .ac-big-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  body.page-anonymous-collections .ac-pay-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media (max-width:960px){
+  body.page-anonymous-collections .ac-secondary-grid{grid-template-columns:1fr}
+}
