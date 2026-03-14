@@ -1045,21 +1045,43 @@ function getPreviousMonthStripeAmount(PDO $pdo): float
 
 function getCollectionByMethod(PDO $pdo, string $start, string $end): array
 {
-    $methods = ['cash' => 0.0, 'bank_transfer' => 0.0, 'pos' => 0.0, 'online' => 0.0, 'adjustment' => 0.0];
-    if (tableExists($pdo, 'operator_ledger')) {
-        try {
-            $stmt = $pdo->prepare('SELECT payment_method, COALESCE(SUM(amount),0) AS total FROM operator_ledger WHERE amount > 0 AND created_at >= ? AND created_at < ? GROUP BY payment_method');
-            $stmt->execute([$start, $end]);
-            foreach ($stmt->fetchAll() as $row) {
-                $key = (string)$row['payment_method'];
-                if (!isset($methods[$key])) $methods[$key] = 0.0;
+    $methods = [
+        'cash' => 0.0,
+        'bank' => 0.0,
+        'pos' => 0.0,
+        'stripe' => 0.0,
+        'online' => 0.0,
+    ];
+
+    if (!tableExists($pdo, 'operator_ledger')) {
+        return $methods;
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT payment_method, COALESCE(SUM(amount), 0) AS total
+            FROM operator_ledger
+            WHERE amount > 0
+              AND created_at >= ?
+              AND created_at < ?
+              AND payment_method IN ('cash', 'bank', 'pos', 'stripe', 'online')
+            GROUP BY payment_method
+        ");
+        $stmt->execute([$start, $end]);
+
+        foreach ($stmt->fetchAll() as $row) {
+            $key = (string)$row['payment_method'];
+            if (isset($methods[$key])) {
                 $methods[$key] = (float)$row['total'];
             }
-        } catch (Throwable $e) {
         }
+    } catch (Throwable $e) {
     }
+
     return $methods;
 }
+
+
 
 function getDailyCollectionSeries(PDO $pdo): array
 {
