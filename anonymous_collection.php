@@ -1,0 +1,489 @@
+<?php
+require_once __DIR__ . '/includes/functions.php';
+startSecureSession();
+require_once __DIR__ . '/includes/db.php';
+requireRole($pdo, ['operator', 'accountant', 'admin']);
+
+$uid = (int)($_SESSION['user_id'] ?? 0);
+$errors = [];
+$success = null;
+
+function ac_e(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+function ac_money(float $amount): string
+{
+    return '€' . number_format($amount, 2);
+}
+
+function ac_table_exists(PDO $pdo, string $table): bool
+{
+    static $cache = [];
+    if (isset($cache[$table])) {
+        return $cache[$table];
+    }
+    $stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+    $stmt->execute([$table]);
+    return $cache[$table] = (bool)$stmt->fetchColumn();
+}
+
+function ac_column_exists(PDO $pdo, string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (isset($cache[$key])) {
+        return $cache[$key];
+    }
+    $stmt = $pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1');
+    $stmt->execute([$table, $column]);
+    return $cache[$key] = (bool)$stmt->fetchColumn();
+}
+
+function ac_generate_invoice(PDO $pdo): string
+{
+    return 'AC-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
+}
+
+function ac_ensure_default_people(PDO $pdo, int $uid = 0): array
+{
+    $map = [
+        'anonymous'    => 'Anonymous Donation',
+        'donation_box' => 'Donation Box Collection',
+        'jumma'        => 'Jumma Collection',
+        'misc'         => 'Misc Collection',
+    ];
+
+    $result = [];
+    $hasCreatedBy = ac_column_exists($pdo, 'people', 'created_by');
+    $hasUpdatedBy = ac_column_exists($pdo, 'people', 'updated_by');
+    $hasUid = ac_column_exists($pdo, 'people', 'uid');
+    $hasCreatedAt = ac_column_exists($pdo, 'people', 'created_at');
+    $hasUpdatedAt = ac_column_exists($pdo, 'people', 'updated_at');
+    $hasCity = ac_column_exists($pdo, 'people', 'city');
+    $hasPhone = ac_column_exists($pdo, 'people', 'phone');
+    $hasNotes = ac_column_exists($pdo, 'people', 'notes');
+
+    foreach ($map as $key => $name) {
+        $find = $pdo->prepare('SELECT ID FROM people WHERE name = ? LIMIT 1');
+        $find->execute([$name]);
+        $existingId = (int)$find->fetchColumn();
+
+        if ($existingId > 0) {
+            $result[$key] = $existingId;
+            continue;
+        }
+
+        $columns = ['name'];
+        $placeholders = ['?'];
+        $values = [$name];
+
+        if ($hasPhone) { $columns[] = 'phone'; $placeholders[] = '?'; $values[] = null; }
+        if ($hasCity) { $columns[] = 'city'; $placeholders[] = '?'; $values[] = 'System'; }
+        if ($hasNotes) { $columns[] = 'notes'; $placeholders[] = '?'; $values[] = 'Auto generated default collection donor'; }
+        if ($hasCreatedBy) { $columns[] = 'created_by'; $placeholders[] = '?'; $values[] = $uid ?: null; }
+        if ($hasUpdatedBy) { $columns[] = 'updated_by'; $placeholders[] = '?'; $values[] = $uid ?: null; }
+        if ($hasUid) { $columns[] = 'uid'; $placeholders[] = '?'; $values[] = $uid ?: null; }
+        if ($hasCreatedAt) { $columns[] = 'created_at'; $placeholders[] = 'NOW()'; }
+        if ($hasUpdatedAt) { $columns[] = 'updated_at'; $placeholders[] = 'NOW()'; }
+
+        $sql = 'INSERT INTO people (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
+        $pdo->prepare($sql)->execute($values);
+        $result[$key] = (int)$pdo->lastInsertId();
+    }
+
+    return $result;
+}
+
+$prefilledBoxId = 0;
+$boxToken = trim((string)($_GET['box'] ?? ''));
+
+if ($boxToken !== '' && ac_table_exists($pdo, 'donation_boxes')) {
+    $stmt = $pdo->prepare('
+        SELECT ID
+        FROM donation_boxes
+        WHERE qr_token = ?
+          AND active = 1
+        LIMIT 1
+    ');
+    $stmt->execute([$boxToken]);
+    $prefilledBoxId = (int)($stmt->fetchColumn() ?: 0);
+}
+
+$defaultPeople = ac_ensure_default_people($pdo, $uid);
+
+$boxes = [];
+if (ac_table_exists($pdo, 'donation_boxes')) {
+    $boxes = $pdo->query(
+        'SELECT ID, box_number, title, active
+         FROM donation_boxes
+         WHERE active = 1
+         ORDER BY box_number ASC, title ASC'
+    )->fetchAll(PDO::FETCH_ASSOC);
+}
+
+$selectedBoxId = (int)($_POST['box_id'] ?? $prefilledBoxId);
+$selectedType = (string)($_POST['collection_type'] ?? '');
+
+if ($selectedType === '') {
+    $selectedType = $prefilledBoxId > 0 ? 'donation_box' : 'anonymous';
+}
+
+if ($prefilledBoxId > 0) {
+    $selectedType = 'donation_box';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfOrFail();
+
+    $collectionType = trim((string)($_POST['collection_type'] ?? $selectedType));
+    if ($prefilledBoxId > 0) {
+        $collectionType = 'donation_box';
+    }
+
+    $allowedTypes = ['anonymous', 'donation_box', 'jumma', 'misc'];
+    if (!in_array($collectionType, $allowedTypes, true)) {
+        $collectionType = 'anonymous';
+    }
+
+    $boxId = (int)($_POST['box_id'] ?? 0);
+    if ($prefilledBoxId > 0) {
+        $boxId = $prefilledBoxId;
+    }
+
+    $amount = (float)($_POST['amount'] ?? 0);
+    $notes = trim((string)($_POST['notes'] ?? ''));
+    $paymentMethod = 'cash';
+
+    $selectedType = $collectionType;
+    $selectedBoxId = $boxId;
+
+    if ($amount <= 0) {
+        $errors[] = 'Amount must be greater than 0.';
+    }
+
+    if ($collectionType === 'donation_box' && $boxId <= 0) {
+        $errors[] = 'Please select a donation box.';
+    }
+
+    if (!$errors && $collectionType === 'donation_box' && $boxId > 0) {
+        $checkBox = $pdo->prepare('SELECT ID FROM donation_boxes WHERE ID = ? AND active = 1 LIMIT 1');
+        $checkBox->execute([$boxId]);
+        if (!(int)$checkBox->fetchColumn()) {
+            $errors[] = 'Selected donation box is invalid or inactive.';
+        }
+    }
+
+    if (!$errors) {
+        $personId = (int)($defaultPeople[$collectionType] ?? 0);
+
+        $insert = $pdo->prepare(
+            'INSERT INTO anonymous_collections (person_id, box_id, collection_type, amount, payment_method, notes, created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())'
+        );
+        $insert->execute([
+            $personId > 0 ? $personId : null,
+            $collectionType === 'donation_box' ? $boxId : null,
+            $collectionType,
+            $amount,
+            $paymentMethod,
+            $notes !== '' ? $notes : null,
+            $uid ?: null,
+        ]);
+
+        if (ac_table_exists($pdo, 'operator_ledger')) {
+            $referenceId = (int)$pdo->lastInsertId();
+            $invoiceNo = ac_generate_invoice($pdo);
+            $receiptToken = bin2hex(random_bytes(8));
+            $ledgerNotes = strtoupper($collectionType) . ($notes !== '' ? ' | ' . $notes : '');
+
+            $ledger = $pdo->prepare(
+                'INSERT INTO operator_ledger (
+                    operator_id, person_id, transaction_type, transaction_category, amount, payment_method,
+                    settlement_status, reference_id, invoice_no, receipt_token, notes, created_by, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+            );
+            $ledger->execute([
+                $uid,
+                $personId > 0 ? $personId : null,
+                'collection',
+                'one_time',
+                $amount,
+                'cash',
+                'confirmed',
+                $referenceId,
+                $invoiceNo,
+                $receiptToken,
+                $ledgerNotes,
+                $uid,
+            ]);
+        }
+
+        $success = 'Collection saved successfully.';
+        $_POST = [];
+        $selectedBoxId = $prefilledBoxId;
+        $selectedType = $prefilledBoxId > 0 ? 'donation_box' : 'anonymous';
+    }
+}
+
+$recentRows = $pdo->query(
+    'SELECT ac.ID, ac.collection_type, ac.amount, ac.payment_method, ac.notes, ac.created_at,
+            db.box_number, db.title AS box_title
+     FROM anonymous_collections ac
+     LEFT JOIN donation_boxes db ON db.ID = ac.box_id
+     ORDER BY ac.ID DESC
+     LIMIT 20'
+)->fetchAll(PDO::FETCH_ASSOC);
+
+$totalToday = (float)$pdo->query(
+    'SELECT COALESCE(SUM(amount), 0)
+     FROM anonymous_collections
+     WHERE DATE(created_at) = CURDATE()'
+)->fetchColumn();
+
+require_once __DIR__ . '/header.php';
+?>
+<link rel="stylesheet" href="anonymous_collection.css">
+
+<div class="anonymous-page">
+    <h1 class="page-title">Anonymous Collection</h1>
+    <p class="page-subtitle">Cash-only entry for anonymous, donation box, jumma, and misc collections.</p>
+
+    <?php if ($boxToken !== ''): ?>
+        <div class="ac-alert <?php echo $prefilledBoxId > 0 ? 'success' : 'error'; ?>">
+            <?php if ($prefilledBoxId > 0): ?>
+                QR donation box detected successfully.
+            <?php else: ?>
+                QR token was provided but no active donation box was matched.
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="anonymous-grid">
+        <div class="ac-card">
+            <h2>New Entry</h2>
+
+            <?php if ($success): ?>
+                <div class="ac-alert success"><?php echo ac_e($success); ?></div>
+            <?php endif; ?>
+
+            <?php if ($errors): ?>
+                <div class="ac-alert error">
+                    <?php foreach ($errors as $error): ?>
+                        <div><?php echo ac_e($error); ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="post">
+                <?php echo csrfField(); ?>
+
+                <div class="ac-field-full">
+                    <label>Collection Type</label>
+                    <div class="ac-type-grid">
+                        <?php
+                        $types = [
+                            'anonymous' => ['🙈', 'Anonymous'],
+                            'donation_box' => ['📦', 'Donation Box'],
+                            'jumma' => ['🕌', 'Jumma'],
+                            'misc' => ['🧾', 'Misc'],
+                        ];
+                        foreach ($types as $typeKey => $typeData):
+                        ?>
+                            <label class="ac-type-option">
+                                <input
+                                    type="radio"
+                                    name="collection_type"
+                                    value="<?php echo ac_e($typeKey); ?>"
+                                    <?php echo $selectedType === $typeKey ? 'checked' : ''; ?>
+                                >
+                                <span class="ac-type-box">
+                                    <span class="ac-type-icon"><?php echo ac_e($typeData[0]); ?></span>
+                                    <span class="ac-type-label"><?php echo ac_e($typeData[1]); ?></span>
+                                </span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <div class="ac-form-grid">
+                    <div class="ac-field" id="boxField" style="display:none;">
+                        <label for="box_id">Donation Box</label>
+
+                        <?php if ($prefilledBoxId > 0): ?>
+                            <?php
+                            $prefilledBoxLabel = '';
+                            foreach ($boxes as $box) {
+                                if ((int)$box['ID'] === $prefilledBoxId) {
+                                    $prefilledBoxLabel = (string)$box['box_number'];
+                                    if (!empty($box['title'])) {
+                                        $prefilledBoxLabel .= ' - ' . (string)$box['title'];
+                                    }
+                                    break;
+                                }
+                            }
+                            ?>
+                            <input type="text" value="<?php echo ac_e($prefilledBoxLabel); ?>" readonly>
+                            <input type="hidden" name="box_id" id="box_id" value="<?php echo (int)$prefilledBoxId; ?>">
+                        <?php else: ?>
+                            <select name="box_id" id="box_id">
+                                <option value="0">Select donation box</option>
+                                <?php foreach ($boxes as $box): ?>
+                                    <option
+                                        value="<?php echo (int)$box['ID']; ?>"
+                                        <?php echo $selectedBoxId === (int)$box['ID'] ? 'selected' : ''; ?>
+                                    >
+                                        <?php
+                                        echo ac_e((string)$box['box_number']);
+                                        if (!empty($box['title'])) {
+                                            echo ' - ' . ac_e((string)$box['title']);
+                                        }
+                                        ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="ac-field">
+                        <label for="amount">Amount</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            name="amount"
+                            id="amount"
+                            required
+                            value="<?php echo ac_e((string)($_POST['amount'] ?? '')); ?>"
+                        >
+                    </div>
+
+                    <div class="ac-field">
+                        <label>Payment Method</label>
+                        <input type="hidden" name="payment_method" value="cash">
+                        <div class="ac-inline-note">Default payment method: <strong style="margin-left:6px;">Cash</strong></div>
+                    </div>
+
+                    <div class="ac-field-full">
+                        <label for="notes">Notes</label>
+                        <textarea name="notes" id="notes" placeholder="Optional notes"><?php echo ac_e((string)($_POST['notes'] ?? '')); ?></textarea>
+                    </div>
+                </div>
+
+                <div class="ac-btn-row">
+                    <button type="submit" class="ac-btn">Save Collection</button>
+                    <a href="donation_boxes_manage.php" class="ac-btn-secondary">Manage Donation Boxes</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="ac-card">
+            <h2>Today Summary</h2>
+            <div class="ac-muted">Total anonymous collection entered today</div>
+            <div class="ac-total"><?php echo ac_money($totalToday); ?></div>
+
+            <div style="height:18px"></div>
+
+            <h2 style="margin-top:0;">Default Donor Records</h2>
+            <div class="ac-table-wrap">
+                <table class="ac-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Person ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($defaultPeople as $key => $personId): ?>
+                            <tr>
+                                <td><span class="ac-badge"><?php echo ac_e(str_replace('_', ' ', $key)); ?></span></td>
+                                <td><?php echo (int)$personId; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="ac-card" style="margin-top:20px;">
+        <h2>Recent Collections</h2>
+        <div class="ac-table-wrap">
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Donation Box</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!$recentRows): ?>
+                        <tr>
+                            <td colspan="6" class="ac-muted">No collections found.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($recentRows as $row): ?>
+                            <tr>
+                                <td><?php echo ac_e(date('d/m/Y H:i', strtotime((string)$row['created_at']))); ?></td>
+                                <td><span class="ac-badge"><?php echo ac_e(str_replace('_', ' ', (string)$row['collection_type'])); ?></span></td>
+                                <td><?php echo ac_e((string)($row['box_number'] ? $row['box_number'] . (!empty($row['box_title']) ? ' - ' . $row['box_title'] : '') : '-')); ?></td>
+                                <td><?php echo ac_money((float)$row['amount']); ?></td>
+                                <td><?php echo ac_e((string)$row['payment_method']); ?></td>
+                                <td><?php echo ac_e((string)($row['notes'] ?? '')); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const typeInputs = document.querySelectorAll('input[name="collection_type"]');
+    const boxField = document.getElementById('boxField');
+    const hasPrefilledBox = <?php echo $prefilledBoxId > 0 ? 'true' : 'false'; ?>;
+
+    function forceDonationBox() {
+        const donationBoxRadio = document.querySelector('input[name="collection_type"][value="donation_box"]');
+        if (donationBoxRadio) {
+            donationBoxRadio.checked = true;
+        }
+        if (boxField) {
+            boxField.style.display = 'flex';
+        }
+    }
+
+    function toggleBoxField() {
+        const selected = document.querySelector('input[name="collection_type"]:checked');
+        const needsBox = selected && selected.value === 'donation_box';
+        if (boxField) {
+            boxField.style.display = needsBox ? 'flex' : 'none';
+        }
+    }
+
+    if (hasPrefilledBox) {
+        forceDonationBox();
+    } else {
+        toggleBoxField();
+    }
+
+    typeInputs.forEach((input) => {
+        input.addEventListener('change', function () {
+            if (hasPrefilledBox) {
+                forceDonationBox();
+            } else {
+                toggleBoxField();
+            }
+        });
+    });
+})();
+</script>
+
+<?php require_once __DIR__ . '/footer.php'; ?>

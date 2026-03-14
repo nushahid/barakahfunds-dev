@@ -15,6 +15,7 @@ $menu = [
     ['file' => 'transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['operator']],
     ['file' => 'expense_page.php', 'label' => 'Add Expense', 'icon' => '💸', 'roles' => ['operator']],
     ['file' => 'anonymous_collections.php', 'label' => 'Anonymous Collections', 'icon' => '📦', 'roles' => ['operator','accountant']],
+    ['file' => 'donation_boxes.php', 'label' => 'Donation Boxes', 'icon' => '🗃️', 'roles' => ['operator','accountant','admin']],
     ['file' => 'transfer_requests.php', 'label' => 'Transfers', 'icon' => '🔄', 'roles' => ['operator','accountant']],
     ['file' => 'accounts_report.php', 'label' => 'Reports', 'icon' => '📊', 'roles' => ['accountant','admin']],
     ['file' => 'stripe_reconciliation.php', 'label' => 'Stripe Reconciliation', 'icon' => '🧾', 'roles' => ['accountant']],

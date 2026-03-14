@@ -1,0 +1,23 @@
+Replace/add these files in your existing project:
+
+- anonymous_collections.php
+- donation_boxes.php
+- includes/header.php
+- header.php
+- assets/pages/anonymous_collections.css
+- assets/pages/donation_boxes.css
+
+Optional SQL once:
+- default_anonymous_people.sql
+
+Notes:
+- No new database or table is created.
+- Uses existing people, anonymous_collections, donation_boxes, and operator_ledger tables.
+- Sidebar link for Donation Boxes is visible to operator and accountant only.
+- Anonymous Collections page is limited to operator and accountant only.
+- Payment method is cash only.
+
+
+V4 patch: donation_boxes.php now allows any logged-in user to open the page. Management actions remain limited to accountant/admin.
+
+V6 patch: donation_boxes.php now uses requireLogin() so any logged-in user in the system can open it. Added donation_box.php redirect alias.

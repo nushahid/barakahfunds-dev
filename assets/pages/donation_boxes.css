@@ -1,0 +1,120 @@
+
+.page-donation-boxes .main {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.anon-subtitle { margin: 4px 0 0; }
+.donation-box-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+.section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.section-head h2 { margin: 0; }
+.field-label {
+    display: block;
+    margin-bottom: 7px;
+    font-weight: 600;
+}
+.two-col-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.status-active {
+    background: #ecfdf3;
+    color: #166534;
+}
+.status-inactive {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+.inline-form { margin: 0; }
+.btn-small { padding: 7px 10px; }
+.small-note {
+    max-width: 260px;
+    white-space: normal;
+}
+.operator-info-card {
+    padding: 20px;
+}
+.donation-box-table-wrap table {
+    width: 100%;
+    min-width: 640px;
+}
+@media (max-width: 980px) {
+    .donation-box-layout,
+    .two-col-grid {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 640px) {
+    .donation-box-table-wrap {
+        overflow: visible;
+    }
+    .responsive-table,
+    .responsive-table thead,
+    .responsive-table tbody,
+    .responsive-table th,
+    .responsive-table td,
+    .responsive-table tr {
+        display: block;
+        width: 100%;
+    }
+    .responsive-table {
+        min-width: 0 !important;
+    }
+    .responsive-table thead {
+        display: none;
+    }
+    .responsive-table tbody {
+        display: grid;
+        gap: 12px;
+    }
+    .responsive-table tr {
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 10px 12px;
+        background: #fff;
+    }
+    .responsive-table td {
+        border: 0;
+        padding: 6px 0;
+        white-space: normal;
+        word-break: break-word;
+    }
+    .responsive-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .02em;
+    }
+}

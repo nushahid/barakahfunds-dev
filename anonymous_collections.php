@@ -2,287 +2,369 @@
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
-requireRole($pdo, ['operator','accountant','admin']);
-if (function_exists('migrateV42')) { migrateV42($pdo); }
+requireRole($pdo, ['operator','accountant']);
 
-$uid = getLoggedInUserId();
-$defaults = function_exists('ensureDefaultAnonymousDonors') ? ensureDefaultAnonymousDonors($pdo) : [];
-if (!$defaults) {
-    $defaults = [
-        'Anonymous Donation' => 0,
-        'Mosque Donation Box' => 0,
-        'Jumma Prayer Collection' => 0,
-        'Miscellaneous Collection' => 0,
-    ];
+if (function_exists('migrateV42')) {
+    migrateV42($pdo);
 }
 
+$uid = getLoggedInUserId();
+$role = currentRole($pdo);
 $errors = [];
-$boxEditId = isset($_GET['edit_box']) ? (int)$_GET['edit_box'] : 0;
-$boxToEdit = null;
+
+function anonymousCollectionTypeLabel(string $type): string
+{
+    return match ($type) {
+        'donation_box' => 'Donation Box',
+        'jumma' => 'Jumma',
+        'misc' => 'Misc',
+        default => 'Anonymous',
+    };
+}
+
+function anonymousCollectionMethodLabel(string $method): string
+{
+    return match ($method) {
+        'bank' => 'Bank',
+        'pos' => 'POS',
+        'stripe' => 'Stripe',
+        'online' => 'Online',
+        default => 'Cash',
+    };
+}
+
+function anonymousCollectionMethodIcon(string $method): string
+{
+    return match ($method) {
+        'bank' => '🏦',
+        'pos' => '💳',
+        'stripe' => '🟪',
+        'online' => '🌐',
+        default => '💵',
+    };
+}
+
+function ensureAnonymousDefaultPeople(PDO $pdo, int $createdBy = 0): array
+{
+    $defaults = [
+        'anonymous' => 'Anonymous Donation',
+        'donation_box' => 'Mosque Donation Box',
+        'jumma' => 'Jumma Prayer Collection',
+        'misc' => 'Miscellaneous Collection',
+    ];
+
+    $select = $pdo->prepare('SELECT ID FROM people WHERE name = ? LIMIT 1');
+    $insert = $pdo->prepare('INSERT INTO people (name, notes, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())');
+
+    $result = [];
+    foreach ($defaults as $type => $name) {
+        $select->execute([$name]);
+        $id = (int)($select->fetchColumn() ?: 0);
+        if ($id <= 0) {
+            $insert->execute([$name, 'System default anonymous collection person', $createdBy ?: null, $createdBy ?: null]);
+            $id = (int)$pdo->lastInsertId();
+        }
+        $result[$type] = $id;
+    }
+
+    return $result;
+}
+
+$defaultPeople = ensureAnonymousDefaultPeople($pdo, $uid);
+$paymentMethods = ['cash', 'bank', 'pos', 'stripe', 'online'];
+$selectedType = 'anonymous';
+$selectedMethod = 'cash';
+$selectedBoxId = 0;
+$amountValue = '';
+$notesValue = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfOrFail();
     $action = (string)($_POST['action'] ?? '');
 
-    if ($action === 'add_box' || $action === 'update_box') {
-        $editId = (int)($_POST['box_id'] ?? 0);
-        $boxNumber = trim((string)($_POST['box_number'] ?? ''));
-        $title = trim((string)($_POST['title'] ?? ''));
-        $notes = trim((string)($_POST['notes'] ?? ''));
-        $active = isset($_POST['active']) ? 1 : 0;
-
-        if ($boxNumber === '') {
-            $errors[] = 'Box number is required.';
-        }
-
-        if (!$errors) {
-            if ($action === 'update_box' && $editId > 0) {
-                $stmt = $pdo->prepare('UPDATE donation_boxes SET box_number = ?, title = ?, notes = ?, active = ? WHERE ID = ?');
-                $stmt->execute([$boxNumber, $title, $notes, $active, $editId]);
-                setFlash('success', 'Donation box updated.');
-            } else {
-                $qr = randomToken(6);
-                $stmt = $pdo->prepare('INSERT INTO donation_boxes (box_number, title, qr_token, active, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())');
-                $stmt->execute([$boxNumber, $title, $qr, 1, $notes, $uid]);
-                setFlash('success', 'Donation box created.');
-            }
-            header('Location: anonymous_collections.php');
-            exit;
-        }
-        $boxEditId = $editId;
-    }
-
-    if ($action === 'add_collection') {
+    if ($action === 'save_collection') {
         $collectionType = (string)($_POST['collection_type'] ?? 'anonymous');
-        $amount = (float)($_POST['amount'] ?? 0);
-        $method = normalizePaymentMethod((string)($_POST['payment_method'] ?? 'cash'));
-        $notes = trim((string)($_POST['notes'] ?? ''));
         $boxId = (int)($_POST['box_id'] ?? 0);
+        $amount = round((float)($_POST['amount'] ?? 0), 2);
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        $paymentMethod = (string)($_POST['payment_method'] ?? 'cash');
 
+        if (!in_array($collectionType, ['anonymous', 'donation_box', 'jumma', 'misc'], true)) {
+            $collectionType = 'anonymous';
+        }
+        if (!in_array($paymentMethod, $paymentMethods, true)) {
+            $paymentMethod = 'cash';
+        }
         if ($amount <= 0) {
             $errors[] = 'Amount must be greater than zero.';
         }
+        if ($collectionType === 'donation_box') {
+            if ($boxId <= 0) {
+                $errors[] = 'Please select a donation box.';
+            } else {
+                $stmt = $pdo->prepare('SELECT ID FROM donation_boxes WHERE ID = ? AND active = 1 LIMIT 1');
+                $stmt->execute([$boxId]);
+                if (!$stmt->fetch()) {
+                    $errors[] = 'Selected donation box is not active.';
+                }
+            }
+        } else {
+            $boxId = 0;
+        }
 
-        $personId = match ($collectionType) {
-            'donation_box' => (int)($defaults['Mosque Donation Box'] ?? 0),
-            'jumma' => (int)($defaults['Jumma Prayer Collection'] ?? 0),
-            'misc' => (int)($defaults['Miscellaneous Collection'] ?? 0),
-            default => (int)($defaults['Anonymous Donation'] ?? 0),
-        };
+        $selectedType = $collectionType;
+        $selectedMethod = $paymentMethod;
+        $selectedBoxId = $boxId;
+        $amountValue = $amount > 0 ? rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.') : '';
+        $notesValue = $notes;
 
         if (!$errors) {
-            $stmt = $pdo->prepare('INSERT INTO anonymous_collections (person_id, box_id, collection_type, amount, payment_method, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
-            $stmt->execute([$personId, $boxId ?: null, $collectionType, $amount, $method, $notes, $uid]);
+            $personId = (int)($defaultPeople[$collectionType] ?? $defaultPeople['anonymous']);
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('INSERT INTO anonymous_collections (person_id, box_id, collection_type, amount, payment_method, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
+                $stmt->execute([
+                    $personId,
+                    $boxId > 0 ? $boxId : null,
+                    $collectionType,
+                    $amount,
+                    $paymentMethod,
+                    $notes !== '' ? $notes : null,
+                    $uid ?: null,
+                ]);
 
-            $invoiceNo = generateInvoiceNumber($pdo);
-            $token = randomToken(8);
-            $category = 'one_time';
-            $settlementStatus = in_array($method, ['bank_transfer', 'pos', 'online'], true) ? 'pending_confirmation' : 'confirmed';
+                $referenceId = $boxId > 0 ? $boxId : null;
+                $invoiceNo = generateInvoiceNumber($pdo);
+                $receiptToken = randomToken(12);
+                $ledgerNotes = anonymousCollectionTypeLabel($collectionType);
+                if ($boxId > 0) {
+                    $boxStmt = $pdo->prepare('SELECT box_number, title FROM donation_boxes WHERE ID = ? LIMIT 1');
+                    $boxStmt->execute([$boxId]);
+                    $box = $boxStmt->fetch();
+                    if ($box) {
+                        $ledgerNotes .= ' | Box ' . (string)$box['box_number'];
+                        if (!empty($box['title'])) {
+                            $ledgerNotes .= ' - ' . trim((string)$box['title']);
+                        }
+                    }
+                }
+                $ledgerNotes .= ' | Method: ' . anonymousCollectionMethodLabel($paymentMethod);
+                if ($notes !== '') {
+                    $ledgerNotes .= ' | ' . $notes;
+                }
 
-            $pdo->prepare('INSERT INTO operator_ledger (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, created_by, created_at) VALUES (?, ?, "collection", ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())')
-                ->execute([$uid, $personId, $category, $amount, $method, $settlementStatus, $boxId ?: null, $invoiceNo, $token, strtoupper($collectionType) . ' | ' . $notes, $uid]);
+                $ledger = $pdo->prepare('INSERT INTO operator_ledger (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+                $ledger->execute([
+                    $uid,
+                    $personId,
+                    'collection',
+                    $collectionType,
+                    $amount,
+                    $paymentMethod,
+                    'confirmed',
+                    $referenceId,
+                    $invoiceNo,
+                    $receiptToken,
+                    $ledgerNotes,
+                    $uid,
+                ]);
 
-            setFlash('success', 'Anonymous collection saved.');
-            header('Location: anonymous_collections.php');
-            exit;
+                $pdo->commit();
+                setFlash('success', 'Anonymous collection saved successfully.');
+                header('Location: anonymous_collections.php');
+                exit;
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $errors[] = 'Unable to save the collection right now.';
+            }
         }
     }
 }
 
-$boxes = tableExists($pdo, 'donation_boxes')
-    ? $pdo->query('SELECT b.*, COALESCE((SELECT SUM(amount) FROM anonymous_collections ac WHERE ac.box_id = b.ID), 0) AS total_collected FROM donation_boxes b ORDER BY b.box_number ASC')->fetchAll()
-    : [];
-$rows = tableExists($pdo, 'anonymous_collections')
-    ? $pdo->query('SELECT ac.*, b.box_number FROM anonymous_collections ac LEFT JOIN donation_boxes b ON b.ID = ac.box_id ORDER BY ac.ID DESC LIMIT 50')->fetchAll()
-    : [];
+$boxRows = [];
+if (tableExists($pdo, 'donation_boxes')) {
+    $boxRows = $pdo->query(
+        'SELECT b.*, COALESCE((SELECT SUM(ac.amount) FROM anonymous_collections ac WHERE ac.box_id = b.ID), 0) AS total_collected
+         FROM donation_boxes b
+         ORDER BY b.active DESC, b.box_number ASC, b.ID ASC'
+    )->fetchAll();
+}
 
-foreach ($boxes as $box) {
-    if ((int)$box['ID'] === $boxEditId) {
-        $boxToEdit = $box;
-        break;
-    }
+$activeBoxes = array_values(array_filter($boxRows, static fn($row) => (int)($row['active'] ?? 0) === 1));
+
+$recentRows = [];
+if (tableExists($pdo, 'anonymous_collections')) {
+    $recentStmt = $pdo->query(
+        'SELECT ac.*, p.name AS person_name, b.box_number, b.title AS box_title
+         FROM anonymous_collections ac
+         LEFT JOIN people p ON p.ID = ac.person_id
+         LEFT JOIN donation_boxes b ON b.ID = ac.box_id
+         ORDER BY ac.ID DESC
+         LIMIT 50'
+    );
+    $recentRows = $recentStmt->fetchAll();
+}
+
+$summaryStmt = $pdo->query(
+    "SELECT collection_type, COALESCE(SUM(amount),0) AS total
+     FROM anonymous_collections
+     GROUP BY collection_type"
+);
+$summary = [
+    'anonymous' => 0.0,
+    'donation_box' => 0.0,
+    'jumma' => 0.0,
+    'misc' => 0.0,
+];
+foreach ($summaryStmt->fetchAll() as $row) {
+    $summary[(string)$row['collection_type']] = (float)$row['total'];
 }
 
 require_once __DIR__ . '/includes/header.php';
 ?>
-<h1 class="title">Anonymous Collections</h1>
-
-<div class="page-intro muted">Fast collection entry with mobile-friendly cards. Donation box management stays on this page, and the quick bottom bar link has been removed.</div>
-
-<div class="ac-layout">
-    <div class="stack">
-        <div class="card ac-form-card">
-            <?php if ($errors): ?>
-                <div class="alert error"><?php foreach ($errors as $er): ?><div><?= e($er) ?></div><?php endforeach; ?></div>
-            <?php endif; ?>
-
-            <div class="toolbar ac-heading-row">
-                <h2 class="ac-title">New Collection</h2>
-                <span class="tag blue">Fast Entry</span>
-            </div>
-
-            <form method="post" class="stack ac-form">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="add_collection">
-
-                <div>
-                    <label class="ac-label">Collection Type</label>
-                    <div class="ac-type-grid">
-                        <?php foreach ([
-                            ['anonymous', '🙈', 'Anonymous'],
-                            ['donation_box', '📦', 'Donation Box'],
-                            ['jumma', '🕌', 'Jumma'],
-                            ['misc', '🧺', 'Misc'],
-                        ] as $c): ?>
-                            <label class="ac-choice-card ac-choice-card-large">
-                                <input type="radio" name="collection_type" value="<?= e($c[0]) ?>" <?= $c[0] === 'anonymous' ? 'checked' : '' ?>>
-                                <span class="ac-choice-card-inner">
-                                    <span class="ac-choice-icon"><?= e($c[1]) ?></span>
-                                    <span class="ac-choice-text"><?= e($c[2]) ?></span>
-                                </span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <div class="inline-grid-2 ac-top-fields">
-                    <div>
-                        <label class="ac-label">Donation Box</label>
-                        <select name="box_id" class="ac-input">
-                            <option value="0">No specific box</option>
-                            <?php foreach ($boxes as $box): ?>
-                                <option value="<?= (int)$box['ID'] ?>">Box <?= e((string)$box['box_number']) ?><?= !empty($box['title']) ? ' · ' . e((string)$box['title']) : '' ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="ac-label">Amount</label>
-                        <input type="number" step="0.01" min="0.01" name="amount" id="anon_amount" class="ac-input" required>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="ac-label">Suggested Amount</label>
-                    <div class="ac-suggested-grid">
-                        <?php foreach ([5, 10, 20, 50, 100] as $amount): ?>
-                            <button class="ac-suggested-card" type="button" onclick="setExactAmount('anon_amount', <?= (int)$amount ?>)"><?= money((float)$amount) ?></button>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="ac-label">Payment Method</label>
-                    <div class="ac-method-grid">
-                        <?php foreach ([
-                            ['cash', '💵', 'Cash'],
-                            ['bank_transfer', '🏦', 'Bank'],
-                            ['pos', '💳', 'POS'],
-                            ['stripe', '🟦', 'Stripe'],
-                        ] as $m): ?>
-                            <label class="ac-choice-card ac-choice-card-method">
-                                <input type="radio" name="payment_method" value="<?= e($m[0]) ?>" <?= $m[0] === 'cash' ? 'checked' : '' ?>>
-                                <span class="ac-choice-card-inner">
-                                    <span class="ac-choice-icon"><?= e($m[1]) ?></span>
-                                    <span class="ac-choice-text"><?= e($m[2]) ?></span>
-                                </span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="ac-label">Notes</label>
-                    <textarea name="notes" class="ac-input ac-textarea" rows="3"></textarea>
-                </div>
-
-                <button class="btn btn-primary ac-save-btn" type="submit">Save Anonymous Collection</button>
-            </form>
-        </div>
-
-        <div class="card ac-form-card">
-            <div class="toolbar ac-heading-row">
-                <h2 class="ac-title"><?= $boxToEdit ? 'Edit Donation Box' : 'New Donation Box' ?></h2>
-                <?php if ($boxToEdit): ?>
-                    <a class="btn" href="anonymous_collections.php">Cancel Edit</a>
-                <?php else: ?>
-                    <span class="tag orange">Boxes</span>
-                <?php endif; ?>
-            </div>
-
-            <form method="post" class="stack ac-box-form">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="<?= $boxToEdit ? 'update_box' : 'add_box' ?>">
-                <input type="hidden" name="box_id" value="<?= (int)($boxToEdit['ID'] ?? 0) ?>">
-
-                <div class="inline-grid-2 ac-top-fields">
-                    <div>
-                        <label class="ac-label">Box Number</label>
-                        <input type="text" name="box_number" class="ac-input" value="<?= e((string)($boxToEdit['box_number'] ?? '')) ?>" required>
-                    </div>
-                    <div>
-                        <label class="ac-label">Title</label>
-                        <input type="text" name="title" class="ac-input" value="<?= e((string)($boxToEdit['title'] ?? '')) ?>">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="ac-label">Notes</label>
-                    <textarea name="notes" class="ac-input ac-textarea" rows="3"><?= e((string)($boxToEdit['notes'] ?? '')) ?></textarea>
-                </div>
-
-                <?php if ($boxToEdit): ?>
-                    <label class="ac-status-toggle">
-                        <input type="checkbox" name="active" value="1" <?= !empty($boxToEdit['active']) ? 'checked' : '' ?>>
-                        <span>Box Active</span>
-                    </label>
-                <?php endif; ?>
-
-                <button class="btn btn-primary ac-save-btn" type="submit"><?= $boxToEdit ? 'Update Donation Box' : 'Create Donation Box' ?></button>
-            </form>
-        </div>
+<div class="page-head">
+    <div>
+        <h1 class="title">Anonymous Collections</h1>
+        <p class="muted anon-subtitle">Collections for anonymous, donation box, Jumma, and misc entries.</p>
     </div>
+</div>
 
-    <div class="stack">
-        <div class="card">
-            <div class="toolbar ac-heading-row">
-                <h2 class="ac-title">Donation Boxes</h2>
-                <span class="tag blue"><?= count($boxes) ?> Total</span>
+<?php if ($errors): ?>
+    <div class="alert error"><?php foreach ($errors as $error): ?><div><?= e($error) ?></div><?php endforeach; ?></div>
+<?php endif; ?>
+
+<?php if ($role === 'accountant'): ?>
+<div class="anon-summary-grid">
+    <div class="card summary-card"><div class="summary-label">Anonymous</div><div class="summary-value"><?= money($summary['anonymous']) ?></div></div>
+    <div class="card summary-card"><div class="summary-label">Donation Box</div><div class="summary-value"><?= money($summary['donation_box']) ?></div></div>
+    <div class="card summary-card"><div class="summary-label">Jumma</div><div class="summary-value"><?= money($summary['jumma']) ?></div></div>
+    <div class="card summary-card"><div class="summary-label">Misc</div><div class="summary-value"><?= money($summary['misc']) ?></div></div>
+</div>
+<?php endif; ?>
+
+<div class="anon-layout-grid<?= $role !== 'accountant' ? ' anon-layout-grid-operator' : '' ?>">
+    <section class="card stack">
+        <div class="section-head">
+            <h2>New Collection</h2>
+        </div>
+        <form method="post" class="stack" id="anonymousCollectionForm">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="save_collection">
+
+            <div>
+                <label class="field-label">Collection Type</label>
+                <div class="type-grid">
+                    <?php foreach ([
+                        ['anonymous', '🙈', 'Anonymous'],
+                        ['donation_box', '📦', 'Donation Box'],
+                        ['jumma', '🕌', 'Jumma'],
+                        ['misc', '🧺', 'Misc'],
+                    ] as $option): ?>
+                        <label class="type-option">
+                            <input type="radio" name="collection_type" value="<?= e($option[0]) ?>" <?= $option[0] === $selectedType ? 'checked' : '' ?>>
+                            <span class="type-chip">
+                                <strong><?= e($option[1]) ?></strong>
+                                <span><?= e($option[2]) ?></span>
+                            </span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
-            <div class="ac-boxes-list">
-                <?php foreach ($boxes as $box):
-                    $boxUrl = publicBaseUrl() . '/anonymous_collections.php?box=' . (int)$box['ID'] . '&token=' . urlencode((string)$box['qr_token']);
-                    $qrImg = 'https://chart.googleapis.com/chart?chs=110x110&cht=qr&chl=' . urlencode($boxUrl);
-                ?>
-                    <div class="ac-box-card">
-                        <div class="ac-box-card-main">
-                            <div>
-                                <div class="ac-box-number">Box <?= e((string)$box['box_number']) ?></div>
-                                <?php if (!empty($box['title'])): ?><div class="muted"><?= e((string)$box['title']) ?></div><?php endif; ?>
-                                <div class="ac-box-total">Collected: <?= money((float)$box['total_collected']) ?></div>
-                                <div class="ac-box-status-row">
-                                    <span class="tag <?= !empty($box['active']) ? 'green' : 'orange' ?>"><?= !empty($box['active']) ? 'Active' : 'Inactive' ?></span>
-                                    <a class="btn btn-small" href="anonymous_collections.php?edit_box=<?= (int)$box['ID'] ?>">Edit</a>
-                                </div>
-                            </div>
-                            <img class="ac-box-qr" src="<?= e($qrImg) ?>" alt="Box QR" width="88" height="88">
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-
-                <?php if (!$boxes): ?>
-                    <div class="muted">No donation boxes yet.</div>
+            <div id="donationBoxField" class="box-field" hidden>
+                <label class="field-label" for="box_id">Donation Box</label>
+                <select name="box_id" id="box_id">
+                    <option value="0">Select donation box</option>
+                    <?php foreach ($activeBoxes as $box): ?>
+                        <option value="<?= (int)$box['ID'] ?>" <?= (int)$box['ID'] === $selectedBoxId ? 'selected' : '' ?>>
+                            Box <?= e((string)$box['box_number']) ?><?= trim((string)($box['title'] ?? '')) !== '' ? ' - ' . e(trim((string)$box['title'])) : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if (!$activeBoxes): ?>
+                    <div class="inline-note">No active donation boxes found. Create one first on the donation boxes page.</div>
                 <?php endif; ?>
             </div>
+
+            <div>
+                <label class="field-label" for="payment_method">Payment Type</label>
+                <div class="payment-grid" role="radiogroup" aria-label="Payment Type">
+                    <?php foreach ($paymentMethods as $method): ?>
+                        <label class="payment-option">
+                            <input type="radio" name="payment_method" value="<?= e($method) ?>" <?= $method === $selectedMethod ? 'checked' : '' ?>>
+                            <span class="payment-chip"><span class="payment-chip-icon"><?= e(anonymousCollectionMethodIcon($method)) ?></span><span class="payment-chip-text"><?= e(anonymousCollectionMethodLabel($method)) ?></span></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div>
+                <label class="field-label" for="amount">Amount</label>
+                <input type="number" step="0.01" min="0.01" name="amount" id="amount" required autocomplete="off" value="<?= e($amountValue) ?>">
+                <div class="quick-amounts">
+                    <?php foreach ([10, 20, 50, 100, 200] as $preset): ?>
+                        <button class="quick-amount-btn" type="button" data-amount="<?= $preset ?>">+<?= $preset ?></button>
+                    <?php endforeach; ?>
+                    <button class="quick-amount-btn clear-btn" type="button" data-clear="1">Clear</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="field-label" for="notes">Notes</label>
+                <textarea name="notes" id="notes" rows="4" placeholder="Optional notes"><?= e($notesValue) ?></textarea>
+            </div>
+
+            <button class="btn btn-primary" type="submit">Save Collection</button>
+        </form>
+    </section>
+
+    <section class="stack">
+        <?php if ($role === 'accountant'): ?>
+        <div class="card">
+            <div class="section-head">
+                <h2>Donation Boxes</h2>
+                <a class="text-link" href="donation_boxes.php">Open page</a>
+            </div>
+            <div class="table-wrap recent-wrap">
+                <table class="responsive-table">
+                    <thead>
+                        <tr>
+                            <th>Box</th>
+                            <th>Status</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach (array_slice($boxRows, 0, 8) as $box): ?>
+                            <tr>
+                                <td data-label="Box">
+                                    <strong><?= e((string)$box['box_number']) ?></strong>
+                                    <?php if (trim((string)($box['title'] ?? '')) !== ''): ?>
+                                        <div class="muted"><?= e((string)$box['title']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Status"><?= (int)$box['active'] === 1 ? 'Active' : 'Inactive' ?></td>
+                                <td data-label="Total"><?= money((float)$box['total_collected']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if (!$boxRows): ?>
+                            <tr><td colspan="3" class="muted">No donation boxes available.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
+        <?php endif; ?>
 
         <div class="card">
-            <div class="toolbar ac-heading-row">
-                <h2 class="ac-title">Recent Anonymous Collections</h2>
-                <span class="tag orange">Latest 50</span>
+            <div class="section-head">
+                <h2>Recent Entries</h2>
+                <span class="muted">Latest 50</span>
             </div>
-            <div class="table-wrap">
-                <table>
+            <div class="table-wrap recent-wrap">
+                <table class="responsive-table">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -293,32 +375,64 @@ require_once __DIR__ . '/includes/header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($rows as $row): ?>
+                        <?php foreach ($recentRows as $row): ?>
                             <tr>
-                                <td><?= e(function_exists('formatDateTimeDisplay') ? formatDateTimeDisplay((string)$row['created_at']) : date('d/m/Y H:i', strtotime((string)$row['created_at']))) ?></td>
-                                <td><?= e(ucwords(str_replace('_', ' ', (string)$row['collection_type']))) ?></td>
-                                <td><?= e((string)($row['box_number'] ?? '—')) ?></td>
-                                <td><?= money((float)$row['amount']) ?></td>
-                                <td><?= e((string)$row['payment_method'] === 'online' ? 'Stripe' : ucwords(str_replace('_', ' ', (string)$row['payment_method']))) ?></td>
+                                <td data-label="Date"><?= e(function_exists('formatDateTimeDisplay') ? formatDateTimeDisplay((string)$row['created_at']) : date('d/m/Y H:i', strtotime((string)$row['created_at']))) ?></td>
+                                <td data-label="Type"><?= e(anonymousCollectionTypeLabel((string)$row['collection_type'])) ?></td>
+                                <td data-label="Box">
+                                    <?php if (!empty($row['box_number'])): ?>
+                                        <?= e((string)$row['box_number']) ?>
+                                        <?php if (trim((string)($row['box_title'] ?? '')) !== ''): ?>
+                                            <div class="muted"><?= e((string)$row['box_title']) ?></div>
+                                        <?php endif; ?>
+                                    <?php else: ?>—<?php endif; ?>
+                                </td>
+                                <td data-label="Amount"><?= money((float)$row['amount']) ?></td>
+                                <td data-label="Method"><?= e(anonymousCollectionMethodLabel((string)($row['payment_method'] ?? 'cash'))) ?></td>
                             </tr>
                         <?php endforeach; ?>
-
-                        <?php if (!$rows): ?>
+                        <?php if (!$recentRows): ?>
                             <tr><td colspan="5" class="muted">No anonymous collections yet.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 
 <script>
-function setExactAmount(targetId, value) {
-    const input = document.getElementById(targetId);
-    if (!input) return;
-    input.value = Number(value).toFixed(2);
-    input.focus();
-}
+(function () {
+    const typeInputs = Array.from(document.querySelectorAll('input[name="collection_type"]'));
+    const boxField = document.getElementById('donationBoxField');
+    const boxSelect = document.getElementById('box_id');
+    const amountInput = document.getElementById('amount');
+
+    function syncBoxField() {
+        const checked = document.querySelector('input[name="collection_type"]:checked');
+        const isBox = checked && checked.value === 'donation_box';
+        boxField.hidden = !isBox;
+        if (!isBox && boxSelect) boxSelect.value = '0';
+    }
+
+    typeInputs.forEach(input => input.addEventListener('change', syncBoxField));
+    syncBoxField();
+
+    document.querySelectorAll('.quick-amount-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            if (this.dataset.clear === '1') {
+                amountInput.value = '';
+                amountInput.focus();
+                return;
+            }
+            const value = parseFloat(this.dataset.amount || '0');
+            const current = parseFloat(amountInput.value || '0');
+            amountInput.value = (current + value).toFixed(2).replace(/\.00$/, '');
+            amountInput.focus();
+        });
+    });
+
+    if (amountInput) amountInput.focus();
+})();
 </script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
