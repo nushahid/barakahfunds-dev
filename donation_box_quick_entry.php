@@ -2,7 +2,6 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
@@ -15,11 +14,6 @@ $success = null;
 function qb_e(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-}
-
-function qb_money(float $amount): string
-{
-    return '€' . number_format($amount, 2);
 }
 
 function qb_table_exists(PDO $pdo, string $table): bool
@@ -41,71 +35,11 @@ function qb_table_exists(PDO $pdo, string $table): bool
     return $cache[$table] = (bool)$stmt->fetchColumn();
 }
 
-function qb_column_exists(PDO $pdo, string $table, string $column): bool
+function qb_get_donation_box_person_id(PDO $pdo): int
 {
-    static $cache = [];
-    $key = $table . '.' . $column;
-
-    if (isset($cache[$key])) {
-        return $cache[$key];
-    }
-
-    $stmt = $pdo->prepare('
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-          AND table_name = ?
-          AND column_name = ?
-        LIMIT 1
-    ');
-    $stmt->execute([$table, $column]);
-
-    return $cache[$key] = (bool)$stmt->fetchColumn();
-}
-
-function qb_generate_invoice(): string
-{
-    return 'AC-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-}
-
-function qb_ensure_donation_box_person(PDO $pdo, int $uid = 0): int
-{
-    $name = 'Donation Box Collection';
-
-    $find = $pdo->prepare('SELECT ID FROM people WHERE name = ? LIMIT 1');
-    $find->execute([$name]);
-    $existingId = (int)$find->fetchColumn();
-
-    if ($existingId > 0) {
-        return $existingId;
-    }
-
-    $hasCreatedBy = qb_column_exists($pdo, 'people', 'created_by');
-    $hasUpdatedBy = qb_column_exists($pdo, 'people', 'updated_by');
-    $hasUid = qb_column_exists($pdo, 'people', 'uid');
-    $hasCreatedAt = qb_column_exists($pdo, 'people', 'created_at');
-    $hasUpdatedAt = qb_column_exists($pdo, 'people', 'updated_at');
-    $hasCity = qb_column_exists($pdo, 'people', 'city');
-    $hasPhone = qb_column_exists($pdo, 'people', 'phone');
-    $hasNotes = qb_column_exists($pdo, 'people', 'notes');
-
-    $columns = ['name'];
-    $placeholders = ['?'];
-    $values = [$name];
-
-    if ($hasPhone) { $columns[] = 'phone'; $placeholders[] = '?'; $values[] = null; }
-    if ($hasCity) { $columns[] = 'city'; $placeholders[] = '?'; $values[] = 'System'; }
-    if ($hasNotes) { $columns[] = 'notes'; $placeholders[] = '?'; $values[] = 'Auto generated default collection donor'; }
-    if ($hasCreatedBy) { $columns[] = 'created_by'; $placeholders[] = '?'; $values[] = $uid ?: null; }
-    if ($hasUpdatedBy) { $columns[] = 'updated_by'; $placeholders[] = '?'; $values[] = $uid ?: null; }
-    if ($hasUid) { $columns[] = 'uid'; $placeholders[] = '?'; $values[] = $uid ?: null; }
-    if ($hasCreatedAt) { $columns[] = 'created_at'; $placeholders[] = 'NOW()'; }
-    if ($hasUpdatedAt) { $columns[] = 'updated_at'; $placeholders[] = 'NOW()'; }
-
-    $sql = 'INSERT INTO people (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
-    $pdo->prepare($sql)->execute($values);
-
-    return (int)$pdo->lastInsertId();
+    $stmt = $pdo->prepare('SELECT ID FROM people WHERE name = ? LIMIT 1');
+    $stmt->execute(['Donation Box Collection']);
+    return (int)($stmt->fetchColumn() ?: 0);
 }
 
 $boxToken = trim((string)($_GET['box'] ?? $_POST['box_token'] ?? ''));
@@ -155,8 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$errors) {
     }
 
     if (!$errors) {
-        $personId = qb_ensure_donation_box_person($pdo, $uid);
+        $personId = qb_get_donation_box_person_id($pdo);
 
+        if ($personId <= 0) {
+            $errors[] = 'Default donor "Donation Box Collection" was not found.';
+        }
+    }
+
+    if (!$errors) {
         $insert = $pdo->prepare('
             INSERT INTO anonymous_collections
                 (person_id, box_id, collection_type, amount, payment_method, notes, created_by, created_at)
@@ -164,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$errors) {
                 (?, ?, ?, ?, ?, ?, ?, NOW())
         ');
         $insert->execute([
-            $personId > 0 ? $personId : null,
+            $personId,
             $boxId,
             $collectionType,
             $amount,
@@ -175,8 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$errors) {
 
         if (qb_table_exists($pdo, 'operator_ledger')) {
             $referenceId = (int)$pdo->lastInsertId();
-            $invoiceNo = qb_generate_invoice();
-            $receiptToken = bin2hex(random_bytes(8));
+            $invoiceNo = generateInvoiceNumber($pdo);
+            $receiptToken = receiptVerificationToken($referenceId, $invoiceNo);
             $ledgerNotes = 'DONATION_BOX' . ($notes !== '' ? ' | ' . $notes : '');
 
             $ledger = $pdo->prepare('
@@ -187,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$errors) {
             ');
             $ledger->execute([
                 $uid,
-                $personId > 0 ? $personId : null,
+                $personId,
                 'collection',
                 'one_time',
                 $amount,
