@@ -107,3 +107,81 @@ body.sidebar-icons-only .main{max-width:calc(100vw - 88px)}body.sidebar-icons-on
   .quick-link{min-width:0;}
   .quick-link small{font-size:11px !important;white-space:nowrap !important;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 }
+/* ICON VIEW FIXES */
+.sidebar.icon-only .sidebar-mode-btn {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    justify-content: center;
+    align-items: center;
+}
+
+.sidebar.icon-only .sidebar-mode-btn span:first-child {
+    font-size: 18px;
+}
+
+/* hide button text in icon view */
+.sidebar.icon-only .sidebar-mode-label {
+    display: none;
+}
+
+/* logo size same as nav icons */
+.sidebar.icon-only .brand-logo {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+}
+
+/* center logo nicely */
+.sidebar.icon-only .brand {
+    justify-content: center;
+}
+
+/* keep spacing consistent */
+.sidebar.icon-only .brand-block {
+    align-items: center;
+}
+
+/* tooltip base */
+.nav-link {
+    position: relative;
+}
+
+/* show tooltip only in icon sidebar */
+.sidebar.icon-only .nav-link:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 55px;
+    top: 50%;
+    transform: translateY(-50%);
+    
+    background: #1f2937;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    white-space: nowrap;
+    
+    opacity: 1;
+    pointer-events: none;
+    z-index: 999;
+}
+
+/* small arrow */
+.sidebar.icon-only .nav-link:hover::before {
+    content: "";
+    position: absolute;
+    left: 48px;
+    top: 50%;
+    transform: translateY(-50%);
+    
+    border-width: 6px;
+    border-style: solid;
+    border-color: transparent #1f2937 transparent transparent;
+}
+
+/* hidden by default */
+.nav-link::after,
+.nav-link::before {
+    opacity: 0;
+}

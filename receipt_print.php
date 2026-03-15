@@ -120,6 +120,38 @@ function receiptDonorAddress(array $row): string
     return '';
 }
 
+function receiptSourceInfo(array $row): array
+{
+    $sourceType = (string)($row['source_type'] ?? '');
+    $contributorCount = (int)($row['contributor_count'] ?? 0);
+    $sourceNote = trim((string)($row['source_note'] ?? ''));
+
+    if ($sourceType === '' && !empty($row['notes'])) {
+        $notes = (string)$row['notes'];
+        if (stripos($notes, 'Collected on behalf of others') !== false) {
+            $sourceType = 'group_collected';
+            if ($contributorCount <= 0 && preg_match('/Contributor count:\s*(\d+)/i', $notes, $m)) {
+                $contributorCount = (int)$m[1];
+            }
+            if ($sourceNote === '' && preg_match('/Source note:\s*([^|]+)/i', $notes, $m)) {
+                $sourceNote = trim($m[1]);
+            }
+        } else {
+            $sourceType = 'self';
+        }
+    }
+
+    $isCollectedForOthers = ($sourceType === 'group_collected');
+
+    return [
+        'source_type' => $sourceType !== '' ? $sourceType : 'self',
+        'is_collected_for_others' => $isCollectedForOthers,
+        'label' => $isCollectedForOthers ? 'Collected on behalf of others' : 'Own donation',
+        'contributor_count' => $contributorCount,
+        'source_note' => $sourceNote,
+    ];
+}
+
 $personId = (int)($row['person_id'] ?? 0);
 $extraPerson = [];
 if ($personId > 0 && tableExists($pdo, 'people')) {
@@ -150,6 +182,7 @@ $receiptNo = $invoice;
 $donationType = receiptDonationType($pdo, $row);
 $descriptionText = receiptDescription($pdo, $row);
 $advanceText = receiptMonthlyAdvanceText($pdo, $row);
+$sourceInfo = receiptSourceInfo($row);
 ?><!doctype html>
 <html>
 <head>
@@ -178,6 +211,8 @@ $advanceText = receiptMonthlyAdvanceText($pdo, $row);
     .line strong { color:#0f172a; }
     .message { margin-top:20px; border:1px solid #dbe4f0; border-radius:14px; padding:18px; background:#fafcff; font-size:16px; line-height:1.7; }
     .message p { margin:0; }
+    .source-box { margin-top:18px; border:1px solid #dbe4f0; border-radius:14px; padding:16px 18px; background:#f8fbff; }
+    .source-box h3 { margin:0 0 10px; font-size:16px; text-transform:uppercase; letter-spacing:.5px; color:#0b3b66; }
     table { width:100%; border-collapse:collapse; margin-top:18px; }
     th, td { border:1px solid #dbe4f0; padding:12px 10px; text-align:left; font-size:15px; }
     th { background:#f8fbff; color:#0b3b66; font-weight:800; }
@@ -210,7 +245,7 @@ $advanceText = receiptMonthlyAdvanceText($pdo, $row);
                 <div class="logo-wrap"><img src="<?= e($logoPath) ?>" alt="Logo"></div>
             <?php endif; ?>
             <div class="brand">
-                <h1><?= e($orgName !== '' ? $orgName : 'Mosque Donation Receipt') ?></h1>
+                <h1><?= e($orgName !== '' ? $orgName : 'Center Donation Receipt') ?></h1>
                 <div class="quote">“Save yourself from hellfire by giving even half a date-fruit in charity.”</div>
             </div>
         </div>
@@ -229,7 +264,7 @@ $advanceText = receiptMonthlyAdvanceText($pdo, $row);
                 <?php if ($personId > 0): ?><div class="line"><strong>Donor ID:</strong> <?= (int)$personId ?></div><?php endif; ?>
             </div>
             <div class="panel">
-                <h3>Mosque Information</h3>
+                <h3>Community Center Information</h3>
                 <?php if ($orgName !== ''): ?><div class="line"><strong>Name:</strong> <?= e($orgName) ?></div><?php endif; ?>
                 <?php if ($orgAddress !== ''): ?><div class="line"><strong>Address:</strong> <?= e($orgAddress) ?></div><?php endif; ?>
                 <?php if ($orgPhone !== ''): ?><div class="line"><strong>Phone:</strong> <?= e($orgPhone) ?></div><?php endif; ?>
@@ -240,9 +275,20 @@ $advanceText = receiptMonthlyAdvanceText($pdo, $row);
 
         <div class="message">
             <p><strong>Assalam-u-Alikum,</strong><br>
-            This is a confirmation receipt of your kind donation towards <strong><?= e($orgName) ?></strong> <strong><?= e($donationType) ?></strong> donation. Charity does not decrease wealth; it increases blessings in this life and the next. Thank You very much, Jazak-a-Allah Khayr.<?= $advanceText ?> <strong><?= e($orgName) ?></strong> Team member.</p>
+            This is a confirmation receipt of your kind donation towards <strong><?= e($orgName) ?></strong> <strong><?= e($donationType) ?></strong> donation. Charity does not decrease wealth; it increases blessings in this life and the next. Thank You very much, Jazak-a-Allah Khayr.</br><?= $advanceText ?> <strong><?= e($orgName) ?></strong> Team member.</p>
         </div>
-
+        <?php if ($sourceInfo['is_collected_for_others']): ?>
+        <div class="source-box">
+            <h3>Donation Source</h3>
+            <div class="line"><strong>Type:</strong> <?= e($sourceInfo['label']) ?></div>
+            <?php if ((int)$sourceInfo['contributor_count'] > 0): ?>
+                <div class="line"><strong>Contributor Count:</strong> <?= (int)$sourceInfo['contributor_count'] ?></div>
+            <?php endif; ?>
+            <?php if ($sourceInfo['source_note'] !== ''): ?>
+                <div class="line"><strong>Source Note:</strong> <?= e($sourceInfo['source_note']) ?></div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
         <table>
             <thead>
                 <tr>

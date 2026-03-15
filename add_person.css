@@ -11,3 +11,80 @@ text-align:center;
 border-radius:10px;
 background:#f5f5f5;
 }
+.donor-toolbar-v5 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn.btn-success {
+    background: #198754;
+    border-color: #198754;
+    color: #fff;
+}
+
+.btn.btn-success:hover,
+.btn.btn-success:focus {
+    background: #157347;
+    border-color: #157347;
+    color: #fff;
+}
+
+/* Toolbar layout */
+.donor-toolbar-v5{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    align-items:center;
+    margin-top:18px;
+}
+
+/* Base button improvements */
+.donor-toolbar-v5 .btn{
+    padding:10px 18px;
+    border-radius:8px;
+    font-weight:600;
+    font-size:14px;
+    border:1px solid transparent;
+    transition:all .18s ease;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+}
+
+/* BACK BUTTON */
+.donor-toolbar-v5 .btn-back{
+    background:#6c757d;
+    color:#fff;
+}
+
+.donor-toolbar-v5 .btn-back:hover{
+    background:#5c636a;
+    transform:translateY(-1px);
+}
+
+/* SAVE DONOR (primary action) */
+.donor-toolbar-v5 .btn-save{
+    background:#0d6efd;
+    color:#fff;
+}
+
+.donor-toolbar-v5 .btn-save:hover{
+    background:#0b5ed7;
+    transform:translateY(-1px);
+}
+
+/* SAVE DONOR + ADD DONATION (workflow action) */
+.donor-toolbar-v5 .btn-donation{
+    background:#198754;
+    color:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,0.12);
+}
+
+.donor-toolbar-v5 .btn-donation:hover{
+    background:#157347;
+    transform:translateY(-1px);
+    box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}

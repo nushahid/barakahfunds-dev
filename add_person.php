@@ -68,6 +68,12 @@ if ($editing) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfOrFail();
+
+    $saveAction = (string)($_POST['save_action'] ?? 'save_only');
+    if (!in_array($saveAction, ['save_only', 'save_and_add_donation'], true)) {
+        $saveAction = 'save_only';
+    }
+
     $existingOrganDonorStatus = (string)$form['organ_donor_status'];
 
     foreach (array_keys($form) as $key) {
@@ -135,6 +141,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         setFlash('success', $editing ? 'Donor updated successfully.' : 'Donor added successfully.');
+
+        if ($saveAction === 'save_and_add_donation') {
+            header('Location: transaction_page.php?person_id=' . $personId . '#category_start_v5');
+            exit;
+        }
+
         header('Location: person_profile.php?id=' . $personId);
         exit;
     }
@@ -311,9 +323,16 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <div class="toolbar">
+        <div class="toolbar donor-toolbar-v5">
             <a class="btn" href="donors.php">Back</a>
-            <button class="btn btn-primary" type="submit"><?= $editing ? 'Update Donor' : 'Save Donor' ?></button>
+
+            <button class="btn btn-primary" type="submit" name="save_action" value="save_only">
+                <?= $editing ? 'Update Donor' : 'Save Donor' ?>
+            </button>
+
+            <button class="btn btn-primary" type="submit" name="save_action" value="save_and_add_donation">
+                <?= $editing ? 'Update Donor & Add Donation' : 'Save Donor & Add Donation' ?>
+            </button>
         </div>
     </form>
 </div>

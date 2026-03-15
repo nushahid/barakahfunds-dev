@@ -59,21 +59,24 @@ $pageCssFile = __DIR__ . '/../assets/pages/' . $pageName . '.css';
 <div class="sidebar-backdrop" onclick="toggleSidebar(false)"></div>
 <div class="layout">
     <aside class="sidebar" id="sidebar">
-        <div class="brand-row">
-            <a class="brand brand-with-logo" href="index.php" aria-label="Dashboard">
-                <?php if ($logoPath !== ''): ?><img class="brand-logo" src="<?= e($logoPath) ?>" alt="<?= e($appTitle) ?> logo"><?php endif; ?>
-                <div>
-                    <div class="brand-title"><?= e($appTitle) ?></div>
-                    <div class="brand-subtitle">Mosque management</div>
-                </div>
-            </a>
-            <?php if ($user): ?>
-            <button class="sidebar-mode-btn" type="button" onclick="toggleSidebarMode()" title="Toggle icons only / icons with text">
-                <span aria-hidden="true">🪄</span>
-                <span class="sidebar-mode-label">Icons / Text</span>
-            </button>
-            <?php endif; ?>
-        </div>
+      <div class="brand-row">
+    <div class="brand-block">
+        <a class="brand brand-with-logo" href="index.php" aria-label="Dashboard">
+            <?php if ($logoPath !== ''): ?><img class="brand-logo" src="<?= e($logoPath) ?>" alt="<?= e($appTitle) ?> logo"><?php endif; ?>
+            <div>
+                <div class="brand-title"><?= e($appTitle) ?></div>
+                <div class="brand-subtitle">Mosque management</div>
+            </div>
+        </a>
+
+        <?php if ($user): ?>
+        <button class="sidebar-mode-btn" type="button" onclick="toggleSidebarMode()" title="Toggle icons only / icons with text">
+            <span aria-hidden="true">🪄</span>
+            <span class="sidebar-mode-label">Icons / Text</span>
+        </button>
+        <?php endif; ?>
+    </div>
+</div>
         <?php if ($user): ?>
             <div class="sidebar-user-card">
                 <div class="muted-light">Signed in as</div>

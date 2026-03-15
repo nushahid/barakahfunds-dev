@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
@@ -33,50 +32,114 @@ $transactions = [];
 $mobileTransactions = [];
 $mobileCutoff = date('Y-m-d H:i:s', strtotime('-6 months'));
 
-if (tableExists($pdo, 'operator_ledger')) {
-    $stmt = $pdo->prepare('
-        SELECT
-            ID,
-            created_at AS date,
-            transaction_category AS cat,
-            amount,
-            payment_method AS method,
-            notes,
-            invoice_no
-        FROM operator_ledger
-        WHERE person_id = ?
-        ORDER BY ID DESC
-        LIMIT 100
-    ');
-    $stmt->execute([$id]);
-    $transactions = $stmt->fetchAll();
-
-    $stmt = $pdo->prepare('
-        SELECT
-            ID,
-            created_at AS date,
-            transaction_category AS cat,
-            amount,
-            payment_method AS method,
-            notes,
-            invoice_no
-        FROM operator_ledger
-        WHERE person_id = ?
-          AND created_at >= ?
-        ORDER BY ID DESC
-        LIMIT 100
-    ');
-    $stmt->execute([$id, $mobileCutoff]);
-    $mobileTransactions = $stmt->fetchAll();
-}
-
 $totalIn = 0;
 $totalOut = 0;
-foreach ($transactions as $t) {
-    if ((float)$t['amount'] >= 0) {
-        $totalIn += (float)$t['amount'];
+$selfDonationTotal = 0;
+$collectedDonationTotal = 0;
+
+$hasSourceColumns = function_exists('columnExists')
+    && tableExists($pdo, 'operator_ledger')
+    && columnExists($pdo, 'operator_ledger', 'source_type')
+    && columnExists($pdo, 'operator_ledger', 'contributor_count')
+    && columnExists($pdo, 'operator_ledger', 'source_note');
+
+if (tableExists($pdo, 'operator_ledger')) {
+    if ($hasSourceColumns) {
+        $stmt = $pdo->prepare('
+            SELECT
+                ID,
+                created_at AS date,
+                transaction_category AS cat,
+                amount,
+                payment_method AS method,
+                notes,
+                invoice_no,
+                source_type,
+                contributor_count,
+                source_note
+            FROM operator_ledger
+            WHERE person_id = ?
+            ORDER BY ID DESC
+            LIMIT 100
+        ');
+        $stmt->execute([$id]);
+        $transactions = $stmt->fetchAll();
+
+        $stmt = $pdo->prepare('
+            SELECT
+                ID,
+                created_at AS date,
+                transaction_category AS cat,
+                amount,
+                payment_method AS method,
+                notes,
+                invoice_no,
+                source_type,
+                contributor_count,
+                source_note
+            FROM operator_ledger
+            WHERE person_id = ?
+              AND created_at >= ?
+            ORDER BY ID DESC
+            LIMIT 100
+        ');
+        $stmt->execute([$id, $mobileCutoff]);
+        $mobileTransactions = $stmt->fetchAll();
     } else {
-        $totalOut += abs((float)$t['amount']);
+        $stmt = $pdo->prepare('
+            SELECT
+                ID,
+                created_at AS date,
+                transaction_category AS cat,
+                amount,
+                payment_method AS method,
+                notes,
+                invoice_no
+            FROM operator_ledger
+            WHERE person_id = ?
+            ORDER BY ID DESC
+            LIMIT 100
+        ');
+        $stmt->execute([$id]);
+        $transactions = $stmt->fetchAll();
+
+        $stmt = $pdo->prepare('
+            SELECT
+                ID,
+                created_at AS date,
+                transaction_category AS cat,
+                amount,
+                payment_method AS method,
+                notes,
+                invoice_no
+            FROM operator_ledger
+            WHERE person_id = ?
+              AND created_at >= ?
+            ORDER BY ID DESC
+            LIMIT 100
+        ');
+        $stmt->execute([$id, $mobileCutoff]);
+        $mobileTransactions = $stmt->fetchAll();
+    }
+}
+
+foreach ($transactions as $t) {
+    $amountValue = (float)$t['amount'];
+
+    if ($amountValue >= 0) {
+        $totalIn += $amountValue;
+
+        if ($hasSourceColumns) {
+            if (($t['source_type'] ?? 'self') === 'group_collected') {
+                $collectedDonationTotal += $amountValue;
+            } else {
+                $selfDonationTotal += $amountValue;
+            }
+        } else {
+            $selfDonationTotal += $amountValue;
+        }
+    } else {
+        $totalOut += abs($amountValue);
     }
 }
 
@@ -135,6 +198,14 @@ require_once __DIR__ . '/includes/header.php';
             <div class="card person-summary-card-v5">
                 <div class="muted">Total Donations</div>
                 <div class="summary"><?= money($totalIn) ?></div>
+            </div>
+            <div class="card person-summary-card-v5">
+                <div class="muted">Own Donations</div>
+                <div class="summary"><?= money($selfDonationTotal) ?></div>
+            </div>
+            <div class="card person-summary-card-v5">
+                <div class="muted">Collected for Others</div>
+                <div class="summary"><?= money($collectedDonationTotal) ?></div>
             </div>
             <div class="card person-summary-card-v5">
                 <div class="muted">Total Expenses</div>
