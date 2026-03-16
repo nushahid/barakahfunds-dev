@@ -51,7 +51,24 @@ label{display:block;font-weight:700;margin-bottom:8px;font-size:16px}input[type=
 body.sidebar-icons-only .layout{grid-template-columns:88px minmax(0,1fr)}
 body.sidebar-icons-only .main{max-width:calc(100vw - 88px)}body.sidebar-icons-only .sidebar{padding-left:14px;padding-right:14px}body.sidebar-icons-only .brand-title,body.sidebar-icons-only .brand-subtitle,body.sidebar-icons-only .sidebar-user-card,body.sidebar-icons-only .sidebar-mode-label,body.sidebar-icons-only .nav-text{display:none}body.sidebar-icons-only .brand-row{align-items:center}body.sidebar-icons-only .brand-with-logo{justify-content:center}body.sidebar-icons-only .brand-logo{width:36px;height:36px}body.sidebar-icons-only .sidebar-mode-btn{padding:10px;justify-content:center;width:100%}body.sidebar-icons-only .nav-link{justify-content:center;padding-left:10px;padding-right:10px}.sidebar-icons-only .nav-icon{margin:0 auto}
 .mobile-topbar-brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1;padding:0 10px}.mobile-topbar-logo{width:34px;height:34px;object-fit:contain;border-radius:10px;background:#fff;padding:3px;box-shadow:0 4px 12px rgba(0,0,0,.1)}.mobile-topbar-title-wrap{min-width:0}.mobile-topbar-title{font-size:15px;font-weight:800;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mobile-topbar-subtitle{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+
+.dashboard-card-role-accountant.dashboard-card-8:before{
+  background: linear-gradient(135deg,#059669,#10b981);
+}
+
+.dashboard-card-role-accountant.dashboard-card-9:before{
+  background: linear-gradient(135deg,#f59e0b,#f97316);
+}
+
+
+.dashboard-card:nth-child(8):before{background:linear-gradient(135deg,#059669,#10b981)}
+.dashboard-card:nth-child(9):before{background:linear-gradient(135deg,#0284c7,#38bdf8)}
+.dashboard-card:nth-child(10):before{background:linear-gradient(135deg,#7c3aed,#6366f1)}
+
+
+
 .dashboard-card{position:relative;overflow:hidden;border:0;color:#fff;min-height:132px}.dashboard-card:before{content:"";position:absolute;inset:0;opacity:.95}.dashboard-card>*{position:relative;z-index:1}.dashboard-card-label{font-size:16px;font-weight:700;letter-spacing:.01em;opacity:.95}.dashboard-card-value{font-size:36px;line-height:1.1;margin-top:14px;color:#fff}.dashboard-card-note{margin-top:10px;font-size:13px;color:rgba(255,255,255,.86)}.dashboard-card .summary,.dashboard-card .muted{color:inherit}.dashboard-card-role-admin.dashboard-card-1:before{background:linear-gradient(135deg,#0f766e,#115e59)}.dashboard-card-role-admin.dashboard-card-2:before{background:linear-gradient(135deg,#1e293b,#0f172a)}.dashboard-card-role-admin.dashboard-card-3:before{background:linear-gradient(135deg,#2563eb,#0284c7)}.dashboard-card-role-admin.dashboard-card-4:before{background:linear-gradient(135deg,#16a34a,#22c55e)}.dashboard-card-role-admin.dashboard-card-5:before{background:linear-gradient(135deg,#dc2626,#f97316)}.dashboard-card-role-admin.dashboard-card-6:before{background:linear-gradient(135deg,#7c3aed,#4f46e5)}.dashboard-card-role-admin.dashboard-card-7:before{background:linear-gradient(135deg,#0f766e,#14b8a6)}.dashboard-card-role-accountant.dashboard-card-1:before{background:linear-gradient(135deg,#0f766e,#14b8a6)}.dashboard-card-role-accountant.dashboard-card-2:before{background:linear-gradient(135deg,#334155,#111827)}.dashboard-card-role-accountant.dashboard-card-3:before{background:linear-gradient(135deg,#2563eb,#0ea5e9)}.dashboard-card-role-accountant.dashboard-card-4:before{background:linear-gradient(135deg,#16a34a,#22c55e)}.dashboard-card-role-accountant.dashboard-card-5:before{background:linear-gradient(135deg,#ef4444,#f97316)}.dashboard-card-role-accountant.dashboard-card-6:before{background:linear-gradient(135deg,#7c3aed,#6366f1)}.dashboard-card-role-accountant.dashboard-card-7:before{background:linear-gradient(135deg,#0891b2,#06b6d4)}.dashboard-card-role-operator.dashboard-card-1:before{background:linear-gradient(135deg,#16a34a,#22c55e)}.dashboard-card-role-operator.dashboard-card-2:before{background:linear-gradient(135deg,#1e293b,#111827)}.dashboard-card-role-operator.dashboard-card-3:before{background:linear-gradient(135deg,#2563eb,#0ea5e9)}.dashboard-card-role-operator.dashboard-card-4:before{background:linear-gradient(135deg,#7c3aed,#4f46e5)}.dashboard-card-role-operator.dashboard-card-5:before{background:linear-gradient(135deg,#dc2626,#f97316)}
+
 
 .donors-summary .card{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.35)}
 .donors-summary .card:before{content:"";position:absolute;inset:0;height:6px;background:linear-gradient(90deg,#f97316,#fb7185,#38bdf8,#22c55e)}
@@ -184,4 +201,50 @@ body.sidebar-icons-only .main{max-width:calc(100vw - 88px)}body.sidebar-icons-on
 .nav-link::after,
 .nav-link::before {
     opacity: 0;
+}
+
+/* ADMIN extra cards */
+.dashboard-card-role-admin.dashboard-card-8:before{
+  background:linear-gradient(135deg,#059669,#10b981);
+}
+.dashboard-card-role-admin.dashboard-card-9:before{
+  background:linear-gradient(135deg,#0284c7,#38bdf8);
+}
+
+/* ACCOUNTANT extra cards */
+.dashboard-card-role-accountant.dashboard-card-8:before{
+  background:linear-gradient(135deg,#059669,#10b981);
+}
+.dashboard-card-role-accountant.dashboard-card-9:before{
+  background:linear-gradient(135deg,#0284c7,#38bdf8);
+}
+
+/* OPERATOR extra cards */
+.dashboard-card-role-operator.dashboard-card-6:before{
+  background:linear-gradient(135deg,#059669,#10b981);
+}
+.dashboard-card-role-operator.dashboard-card-7:before{
+  background:linear-gradient(135deg,#0284c7,#38bdf8);
+}
+
+
+.dashboard-card-role-admin.dashboard-card-8:before{
+  background:linear-gradient(135deg,#0f766e,#14b8a6);
+}
+.dashboard-card-role-admin.dashboard-card-9:before{
+  background:linear-gradient(135deg,#f59e0b,#f97316);
+}
+
+.dashboard-card-role-accountant.dashboard-card-8:before{
+  background:linear-gradient(135deg,#0f766e,#14b8a6);
+}
+.dashboard-card-role-accountant.dashboard-card-9:before{
+  background:linear-gradient(135deg,#f59e0b,#f97316);
+}
+
+.dashboard-card-role-operator.dashboard-card-6:before{
+  background:linear-gradient(135deg,#0f766e,#14b8a6);
+}
+.dashboard-card-role-operator.dashboard-card-7:before{
+  background:linear-gradient(135deg,#f59e0b,#f97316);
 }
