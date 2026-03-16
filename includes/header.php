@@ -22,7 +22,7 @@ $menu = [
     ['file' => 'stripe_reconciliation.php', 'label' => 'Stripe Reconciliation', 'icon' => '🧾', 'roles' => ['accountant']],
     ['file' => 'payment_adjustments.php', 'label' => 'Payment Adjustments', 'icon' => '🛠️', 'roles' => ['accountant']],
     ['file' => 'event_page.php', 'label' => 'Events', 'icon' => '🎉', 'roles' => ['accountant','admin']],
-    ['file' => 'loan_page.php', 'label' => 'Loans', 'icon' => '🤝', 'roles' => ['accountant','admin']],
+    ['file' => 'loan_page.php', 'label' => 'Loan Management', 'icon' => '🤝', 'roles' => ['accountant','admin']],
     ['file' => 'transaction_delete_requests.php', 'label' => 'Delete Requests', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
     ['file' => 'deleted_transactions.php', 'label' => 'Deleted Transactions', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
     ['file' => 'expense_categories.php', 'label' => 'Expense Categories', 'icon' => '🗂️', 'roles' => ['accountant','admin']],

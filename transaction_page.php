@@ -25,13 +25,20 @@ if ($selectedDonorId > 0) {
 }
 
 if ($q !== '') {
-    $stmt = $pdo->prepare("SELECT ID, name, city, phone FROM people WHERE name LIKE ? OR phone LIKE ? OR city LIKE ? OR CAST(ID AS CHAR) LIKE ? ORDER BY name ASC LIMIT 30");
+    $stmt = $pdo->prepare("
+        SELECT ID, name, city, phone
+        FROM people
+        WHERE name LIKE ? OR phone LIKE ? OR city LIKE ? OR CAST(ID AS CHAR) LIKE ?
+        ORDER BY name ASC
+        LIMIT 30
+    ");
     $like = '%' . $q . '%';
     $stmt->execute([$like, $like, $like, $like]);
     $results = $stmt->fetchAll();
 }
 
-function tx_old(string $key, $default = '') {
+function tx_old(string $key, $default = '')
+{
     return $_POST[$key] ?? $default;
 }
 
@@ -46,27 +53,144 @@ function tx_payment_mode(string $paymentMethod): string
 
 function tx_save_monthly_agreement(PDO $pdo, int $personId, float $amount, string $paymentMethod, int $uid): void
 {
-    if ($personId <= 0 || $amount <= 0) return;
-
-    if (function_exists('tableExists') && function_exists('columnExists') && tableExists($pdo, 'people') && columnExists($pdo, 'people', 'monthly_subscription')) {
-        $pdo->prepare('UPDATE people SET monthly_subscription = 1, updated_by = ?, updated_at = NOW() WHERE ID = ?')->execute([$uid, $personId]);
-    }
-
-    if (!function_exists('tableExists') || !tableExists($pdo, 'member_monthly_plans')) return;
-
-    $mode = tx_payment_mode($paymentMethod);
-    $existing = function_exists('getPersonCurrentPlan') ? getPersonCurrentPlan($pdo, $personId) : null;
-    if ($existing && (int)($existing['active'] ?? 0) === 1) {
-        $currentAmount = (float)($existing['amount'] ?? 0);
-        if ($currentAmount <= 0) {
-            $pdo->prepare('UPDATE member_monthly_plans SET amount = ?, payment_mode = ?, assigned_operator_id = ?, active = 1, stop_date = NULL WHERE ID = ?')->execute([$amount, $mode, $uid, (int)$existing['ID']]);
-        } elseif ((string)($existing['payment_mode'] ?? '') !== $mode) {
-            $pdo->prepare('UPDATE member_monthly_plans SET payment_mode = ?, assigned_operator_id = ?, active = 1, stop_date = NULL WHERE ID = ?')->execute([$mode, $uid, (int)$existing['ID']]);
-        }
+    if ($personId <= 0 || $amount <= 0) {
         return;
     }
 
-    $pdo->prepare('INSERT INTO member_monthly_plans (member_id, amount, payment_mode, assigned_operator_id, active, start_date, notes, created_at) VALUES (?, ?, ?, ?, 1, CURDATE(), ?, NOW())')->execute([$personId, $amount, $mode, $uid, 'Auto-created from first monthly donation collection']);
+    if (
+        function_exists('tableExists') &&
+        function_exists('columnExists') &&
+        tableExists($pdo, 'people') &&
+        columnExists($pdo, 'people', 'monthly_subscription')
+    ) {
+        $pdo->prepare('UPDATE people SET monthly_subscription = 1, updated_by = ?, updated_at = NOW() WHERE ID = ?')
+            ->execute([$uid, $personId]);
+    }
+
+    if (!function_exists('tableExists') || !tableExists($pdo, 'member_monthly_plans')) {
+        return;
+    }
+
+    $mode = tx_payment_mode($paymentMethod);
+    $existing = function_exists('getPersonCurrentPlan') ? getPersonCurrentPlan($pdo, $personId) : null;
+
+    if ($existing && (int)($existing['active'] ?? 0) === 1) {
+        $currentAmount = (float)($existing['amount'] ?? 0);
+
+        if ($currentAmount <= 0) {
+            $pdo->prepare('
+                UPDATE member_monthly_plans
+                SET amount = ?, payment_mode = ?, assigned_operator_id = ?, active = 1, stop_date = NULL
+                WHERE ID = ?
+            ')->execute([$amount, $mode, $uid, (int)$existing['ID']]);
+        } elseif ((string)($existing['payment_mode'] ?? '') !== $mode) {
+            $pdo->prepare('
+                UPDATE member_monthly_plans
+                SET payment_mode = ?, assigned_operator_id = ?, active = 1, stop_date = NULL
+                WHERE ID = ?
+            ')->execute([$mode, $uid, (int)$existing['ID']]);
+        }
+
+        return;
+    }
+
+    $pdo->prepare('
+        INSERT INTO member_monthly_plans
+        (member_id, amount, payment_mode, assigned_operator_id, active, start_date, notes, created_at)
+        VALUES (?, ?, ?, ?, 1, CURDATE(), ?, NOW())
+    ')->execute([$personId, $amount, $mode, $uid, 'Auto-created from first monthly donation collection']);
+}
+
+function tx_create_loan_records(
+    PDO $pdo,
+    int $personId,
+    string $personName,
+    string $loanType,
+    string $loanTitle,
+    float $amount,
+    string $paymentMethod,
+    string $transactionDate,
+    string $returnDate,
+    string $notes,
+    int $uid
+): array {
+    if ($personId <= 0) {
+        throw new RuntimeException('Invalid person for loan.');
+    }
+
+    if ($amount <= 0) {
+        throw new RuntimeException('Loan amount must be greater than zero.');
+    }
+
+    if (!function_exists('tableExists') || !tableExists($pdo, 'loan')) {
+        throw new RuntimeException('loan table not found.');
+    }
+
+    if (!function_exists('tableExists') || !tableExists($pdo, 'loan_trans')) {
+        throw new RuntimeException('loan_trans table not found.');
+    }
+
+    $loanType = trim($loanType);
+    if (!in_array($loanType, ['Provide', 'Receive'], true)) {
+        throw new RuntimeException('Invalid loan type.');
+    }
+
+    $loanTitle = trim($loanTitle);
+    if ($loanTitle === '') {
+        throw new RuntimeException('Loan title/purpose is required.');
+    }
+
+    $loanNotes = trim($notes);
+    $loanCreatedAt = $transactionDate . ' 00:00:00';
+
+    $loanStmt = $pdo->prepare('
+        INSERT INTO loan
+        (pid, name, amount, received_date, return_date, returned, method, type, notes, uid, created_at)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+    ');
+    $loanStmt->execute([
+        $personId,
+        $loanTitle,
+        $amount,
+        $transactionDate,
+        $returnDate !== '' ? $returnDate : null,
+        $paymentMethod,
+        $loanType,
+        $loanNotes,
+        $uid,
+        $loanCreatedAt
+    ]);
+
+    $loanId = (int)$pdo->lastInsertId();
+
+    $transNoteParts = [];
+    $transNoteParts[] = $loanType === 'Provide' ? 'Loan provided by mosque' : 'Loan received by mosque';
+    $transNoteParts[] = 'Person: ' . $personName;
+    $transNoteParts[] = 'Title: ' . $loanTitle;
+    if ($loanNotes !== '') {
+        $transNoteParts[] = 'Notes: ' . $loanNotes;
+    }
+
+    $loanTransStmt = $pdo->prepare('
+        INSERT INTO loan_trans
+        (lid, amount, method, notes, uid, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ');
+    $loanTransStmt->execute([
+        $loanId,
+        $amount,
+        $paymentMethod,
+        implode(' | ', $transNoteParts),
+        $uid,
+        $loanCreatedAt
+    ]);
+
+    $loanTransId = (int)$pdo->lastInsertId();
+
+    return [
+        'loan_id' => $loanId,
+        'loan_trans_id' => $loanTransId,
+    ];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '') === 'collect') {
@@ -79,7 +203,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
     $notes = trim((string)($_POST['notes'] ?? ''));
     $date = trim((string)($_POST['transaction_date'] ?? date('Y-m-d')));
     $eventId = (int)($_POST['event_id'] ?? 0);
-    $loanCategory = trim((string)($_POST['loan_category'] ?? ''));
+
+    $loanType = trim((string)($_POST['loan_type'] ?? ''));
+    $loanTitle = trim((string)($_POST['loan_title'] ?? ''));
+    $loanReturnDate = trim((string)($_POST['loan_return_date'] ?? ''));
 
     $isCollectedForOthers = (int)($_POST['collected_for_others'] ?? 0) === 1;
     $contributorCount = (int)($_POST['contributor_count'] ?? 0);
@@ -88,13 +215,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
     $allowedCategories = ['one_time', 'monthly', 'event', 'loan'];
     $allowedMethods = ['cash', 'bank', 'pos', 'stripe', 'online'];
 
-    if ($selectedDonorId <= 0) $errors[] = 'Please select a donor.';
-    if (!in_array($category, $allowedCategories, true)) $errors[] = 'Invalid category.';
-    if ($amount <= 0) $errors[] = 'Amount must be greater than zero.';
-    if (!in_array($paymentMethod, $allowedMethods, true)) $errors[] = 'Invalid payment method.';
-    if ($date === '') $errors[] = 'Date is required.';
-    if ($category === 'event' && $eventId <= 0) $errors[] = 'Please select an event.';
-    if ($category === 'loan' && $loanCategory === '') $errors[] = 'Please select a loan category.';
+    if ($selectedDonorId <= 0) {
+        $errors[] = 'Please select a donor.';
+    }
+
+    if (!in_array($category, $allowedCategories, true)) {
+        $errors[] = 'Invalid category.';
+    }
+
+    if ($amount <= 0) {
+        $errors[] = 'Amount must be greater than zero.';
+    }
+
+    if (!in_array($paymentMethod, $allowedMethods, true)) {
+        $errors[] = 'Invalid payment method.';
+    }
+
+    if ($date === '') {
+        $errors[] = 'Date is required.';
+    }
+
+    if ($category === 'event' && $eventId <= 0) {
+        $errors[] = 'Please select an event.';
+    }
+
+    if ($category === 'loan' && !in_array($loanType, ['Provide', 'Receive'], true)) {
+        $errors[] = 'Please select loan type.';
+    }
+
+    if ($category === 'loan' && $loanTitle === '') {
+        $errors[] = 'Loan title / purpose is required.';
+    }
 
     if ($isCollectedForOthers && $contributorCount > 0 && $contributorCount < 2) {
         $errors[] = 'Contributor count must be at least 2.';
@@ -105,37 +256,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
         $stmt->execute([$selectedDonorId]);
         $selectedDonor = $stmt->fetch() ?: null;
     }
-    if ($selectedDonorId > 0 && !$selectedDonor) $errors[] = 'Selected donor was not found.';
+
+    if ($selectedDonorId > 0 && !$selectedDonor) {
+        $errors[] = 'Selected donor was not found.';
+    }
 
     if (!$errors) {
         try {
             $pdo->beginTransaction();
+
             $referenceId = null;
+            $ledgerCategory = $category;
+            $ledgerTransactionType = 'credit';
             $descriptionBits = [];
+            $loanIds = null;
 
             if ($category === 'event') {
                 $eventStmt = $pdo->prepare('SELECT ID, name FROM events WHERE ID = ? LIMIT 1');
                 $eventStmt->execute([$eventId]);
                 $eventRow = $eventStmt->fetch();
-                if (!$eventRow) throw new RuntimeException('Selected event was not found.');
+
+                if (!$eventRow) {
+                    throw new RuntimeException('Selected event was not found.');
+                }
+
                 if (function_exists('tableExists') && tableExists($pdo, 'event_details')) {
-                    $evDetailStmt = $pdo->prepare('INSERT INTO event_details (pid, event_id, amount, notes, uid, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-                    $evDetailStmt->execute([$selectedDonorId, $eventId, $amount, $notes !== '' ? $notes : 'Event donation', $uid, $date . ' 00:00:00']);
+                    $evDetailStmt = $pdo->prepare('
+                        INSERT INTO event_details (pid, event_id, amount, notes, uid, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ');
+                    $evDetailStmt->execute([
+                        $selectedDonorId,
+                        $eventId,
+                        $amount,
+                        $notes !== '' ? $notes : 'Event donation',
+                        $uid,
+                        $date . ' 00:00:00'
+                    ]);
                     $referenceId = (int)$pdo->lastInsertId();
                 } else {
                     $referenceId = $eventId;
                 }
+
                 $descriptionBits[] = 'Event: ' . (string)$eventRow['name'];
             }
-
-            if ($category === 'loan') $descriptionBits[] = 'Loan: ' . $loanCategory;
 
             if ($category === 'monthly') {
                 tx_save_monthly_agreement($pdo, $selectedDonorId, $amount, $paymentMethod, $uid);
 
                 if (function_exists('tableExists') && tableExists($pdo, 'monthly')) {
-                    $legacy = $pdo->prepare('INSERT INTO monthly (pid, expected, collected, method, notes, uid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-                    $legacy->execute([$selectedDonorId, (int)round($amount), (int)round($amount), $paymentMethod, $notes, $uid, $date . ' 00:00:00']);
+                    $legacy = $pdo->prepare('
+                        INSERT INTO monthly (pid, expected, collected, method, notes, uid, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ');
+                    $legacy->execute([
+                        $selectedDonorId,
+                        (int)round($amount),
+                        (int)round($amount),
+                        $paymentMethod,
+                        $notes,
+                        $uid,
+                        $date . ' 00:00:00'
+                    ]);
                 }
 
                 $plan = function_exists('getPersonCurrentPlan') ? getPersonCurrentPlan($pdo, $selectedDonorId) : null;
@@ -148,9 +330,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
             }
 
             if ($category === 'one_time' && function_exists('tableExists') && tableExists($pdo, 'one_time')) {
-                $legacy = $pdo->prepare('INSERT INTO one_time (pid, expected, collected, method, notes, uid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-                $legacy->execute([$selectedDonorId, (int)round($amount), (int)round($amount), $paymentMethod, $notes, $uid, $date . ' 00:00:00']);
-                $referenceId = $referenceId ?: (int)$pdo->lastInsertId();
+                $legacy = $pdo->prepare('
+                    INSERT INTO one_time (pid, expected, collected, method, notes, uid, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ');
+                $legacy->execute([
+                    $selectedDonorId,
+                    (int)round($amount),
+                    (int)round($amount),
+                    $paymentMethod,
+                    $notes,
+                    $uid,
+                    $date . ' 00:00:00'
+                ]);
+                $referenceId = (int)$pdo->lastInsertId();
+            }
+
+            if ($category === 'loan') {
+                $loanIds = tx_create_loan_records(
+                    $pdo,
+                    $selectedDonorId,
+                    (string)$selectedDonor['name'],
+                    $loanType,
+                    $loanTitle,
+                    $amount,
+                    $paymentMethod,
+                    $date,
+                    $loanReturnDate,
+                    $notes,
+                    $uid
+                );
+
+                $referenceId = (int)$loanIds['loan_trans_id'];
+                $ledgerCategory = 'loan';
+                $ledgerTransactionType = $loanType === 'Provide' ? 'debit' : 'credit';
+
+                $descriptionBits[] = 'Loan Type: ' . $loanType;
+                $descriptionBits[] = 'Loan Title: ' . $loanTitle;
+                if ($loanReturnDate !== '') {
+                    $descriptionBits[] = 'Expected Return: ' . $loanReturnDate;
+                }
             }
 
             if ($isCollectedForOthers) {
@@ -168,7 +387,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
             }
 
             $invoiceNo = generateInvoiceNumber($pdo);
-            $receiptToken = function_exists('receiptVerificationToken') ? receiptVerificationToken(0, $invoiceNo) : randomToken(8);
+            $receiptToken = function_exists('receiptVerificationToken')
+                ? receiptVerificationToken(0, $invoiceNo)
+                : randomToken(8);
+
             $finalNotes = trim(implode(' | ', array_filter(array_merge($descriptionBits, [$notes]))));
 
             $hasSourceColumns = function_exists('columnExists')
@@ -179,12 +401,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
             if ($hasSourceColumns) {
                 $sourceType = $isCollectedForOthers ? 'group_collected' : 'self';
 
-                $ledgerStmt = $pdo->prepare('INSERT INTO operator_ledger (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, source_type, contributor_count, source_note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $ledgerStmt = $pdo->prepare('
+                    INSERT INTO operator_ledger
+                    (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, source_type, contributor_count, source_note, created_by, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ');
                 $ledgerStmt->execute([
                     $uid,
                     $selectedDonorId,
-                    'credit',
-                    $category,
+                    $ledgerTransactionType,
+                    $ledgerCategory,
                     $amount,
                     $paymentMethod,
                     'pending',
@@ -199,64 +425,135 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                     $date . ' 00:00:00'
                 ]);
             } else {
-                $ledgerStmt = $pdo->prepare('INSERT INTO operator_ledger (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-                $ledgerStmt->execute([$uid, $selectedDonorId, 'credit', $category, $amount, $paymentMethod, 'pending', $referenceId, $invoiceNo, $receiptToken, $finalNotes, $uid, $date . ' 00:00:00']);
+                $ledgerStmt = $pdo->prepare('
+                    INSERT INTO operator_ledger
+                    (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, created_by, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ');
+                $ledgerStmt->execute([
+                    $uid,
+                    $selectedDonorId,
+                    $ledgerTransactionType,
+                    $ledgerCategory,
+                    $amount,
+                    $paymentMethod,
+                    'pending',
+                    $referenceId,
+                    $invoiceNo,
+                    $receiptToken,
+                    $finalNotes,
+                    $uid,
+                    $date . ' 00:00:00'
+                ]);
             }
 
             $ledgerId = (int)$pdo->lastInsertId();
 
             if (function_exists('receiptVerificationToken')) {
-                $pdo->prepare('UPDATE operator_ledger SET receipt_token = ? WHERE ID = ?')->execute([receiptVerificationToken($ledgerId, $invoiceNo), $ledgerId]);
+                $pdo->prepare('UPDATE operator_ledger SET receipt_token = ? WHERE ID = ?')
+                    ->execute([receiptVerificationToken($ledgerId, $invoiceNo), $ledgerId]);
             }
 
-            if (function_exists('systemLog')) systemLog($pdo, $uid, 'donation', 'create', 'Collected ' . $category . ' donation', $ledgerId);
-            if (function_exists('personLog')) personLog($pdo, $uid, $selectedDonorId, 'donation', 'Collected ' . $category . ' donation of ' . number_format($amount, 2, '.', ''));
+            if (function_exists('systemLog')) {
+                systemLog(
+                    $pdo,
+                    $uid,
+                    $category === 'loan' ? 'loan' : 'donation',
+                    'create',
+                    $category === 'loan' ? ('Created loan transaction: ' . $loanType) : ('Collected ' . $category . ' donation'),
+                    $ledgerId
+                );
+            }
+
+            if (function_exists('personLog')) {
+                $personAction = $category === 'loan'
+                    ? ('Loan ' . $loanType . ' of ' . number_format($amount, 2, '.', ''))
+                    : ('Collected ' . $category . ' donation of ' . number_format($amount, 2, '.', ''));
+
+                personLog($pdo, $uid, $selectedDonorId, $category === 'loan' ? 'loan' : 'donation', $personAction);
+            }
 
             $pdo->commit();
 
             if (function_exists('setFlash')) {
-                setFlash('success', 'Donation saved successfully.');
+                setFlash('success', $category === 'loan' ? 'Loan saved successfully.' : 'Donation saved successfully.');
             }
 
             header('Location: receipt_print.php?id=' . $ledgerId);
             exit;
 
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $errors[] = $e->getMessage();
         }
     }
 }
 
 $events = function_exists('getEvents') ? getEvents($pdo) : [];
-$loanCategories = ['loan_given', 'loan_return', 'loan_support'];
 $autoJumpToCategory = $selectedDonorId > 0 && $selectedDonor && $_SERVER['REQUEST_METHOD'] !== 'POST';
 
 require_once __DIR__ . '/includes/header.php';
 ?>
-<h1 class="title">Collect Donation</h1>
+<h1 class="title">Collect Donation / Loan</h1>
+
 <div class="card collect-card-v5 stack">
-    <?php if ($success): ?><div class="alert success"><?= e($success) ?></div><?php endif; ?>
-    <?php if ($errorFlash): ?><div class="alert error"><?= e($errorFlash) ?></div><?php endif; ?>
-    <?php if ($errors): ?><div class="alert error"><?php foreach ($errors as $er): ?><div><?= e($er) ?></div><?php endforeach; ?></div><?php endif; ?>
+    <?php if ($success): ?>
+        <div class="alert success"><?= e($success) ?></div>
+    <?php endif; ?>
+
+    <?php if ($errorFlash): ?>
+        <div class="alert error"><?= e($errorFlash) ?></div>
+    <?php endif; ?>
+
+    <?php if ($errors): ?>
+        <div class="alert error">
+            <?php foreach ($errors as $er): ?>
+                <div><?= e($er) ?></div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 
     <form method="get" class="collect-search-wrap-v5">
         <div class="collect-search-row-v5">
-            <input type="text" name="q" value="<?= e($q) ?>" placeholder="Search donor by name, phone, city or donor ID" class="collect-search-input-v5">
+            <input
+                type="text"
+                name="q"
+                value="<?= e($q) ?>"
+                placeholder="Search donor by name, phone, city or donor ID"
+                class="collect-search-input-v5"
+            >
             <button type="submit" class="btn collect-search-btn-v5">Search</button>
         </div>
-        <div class="collect-search-actions-v5"><a href="add_person.php" class="btn btn-primary collect-add-btn-v5">Add New Donor</a></div>
+        <div class="collect-search-actions-v5">
+            <a href="add_person.php" class="btn btn-primary collect-add-btn-v5">Add New Donor</a>
+        </div>
     </form>
 
     <?php if ($q !== '' && !$selectedDonor): ?>
-    <div id="donor_results" class="collect-results-v5">
-        <?php if ($results): foreach ($results as $row): ?>
-        <button type="button" class="collect-donor-result-v5" data-donor-id="<?= (int)$row['ID'] ?>" data-donor-name="<?= e((string)$row['name']) ?>" data-donor-city="<?= e((string)($row['city'] ?: '')) ?>" data-donor-phone="<?= e((string)($row['phone'] ?: '')) ?>">
-            <span class="collect-donor-left-v5"><strong><?= e((string)$row['name']) ?></strong><small>ID <?= (int)$row['ID'] ?><?= !empty($row['city']) ? ' · ' . e((string)$row['city']) : '' ?></small></span>
-            <span class="collect-donor-right-v5"><?= e((string)($row['phone'] ?: '—')) ?></span>
-        </button>
-        <?php endforeach; else: ?><div class="muted">No donor found.</div><?php endif; ?>
-    </div>
+        <div id="donor_results" class="collect-results-v5">
+            <?php if ($results): ?>
+                <?php foreach ($results as $row): ?>
+                    <button
+                        type="button"
+                        class="collect-donor-result-v5"
+                        data-donor-id="<?= (int)$row['ID'] ?>"
+                        data-donor-name="<?= e((string)$row['name']) ?>"
+                        data-donor-city="<?= e((string)($row['city'] ?: '')) ?>"
+                        data-donor-phone="<?= e((string)($row['phone'] ?: '')) ?>"
+                    >
+                        <span class="collect-donor-left-v5">
+                            <strong><?= e((string)$row['name']) ?></strong>
+                            <small>ID <?= (int)$row['ID'] ?><?= !empty($row['city']) ? ' · ' . e((string)$row['city']) : '' ?></small>
+                        </span>
+                        <span class="collect-donor-right-v5"><?= e((string)($row['phone'] ?: '—')) ?></span>
+                    </button>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="muted">No donor found.</div>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
 
     <form method="post" id="collect_form_v5" class="stack">
@@ -267,36 +564,124 @@ require_once __DIR__ . '/includes/header.php';
 
         <div id="selected_donor_box" class="collect-selected-v5<?= $selectedDonor ? ' is-selected' : '' ?>">
             <div class="muted">Selected donor</div>
-            <div id="selected_donor_name" class="collect-selected-name-v5"><?= e((string)($selectedDonor['name'] ?? 'No donor selected')) ?></div>
-            <div id="selected_donor_meta" class="collect-selected-meta-v5"><?php if ($selectedDonor): ?>ID <?= (int)$selectedDonor['ID'] ?><?= !empty($selectedDonor['city']) ? ' · ' . e((string)$selectedDonor['city']) : '' ?><?= !empty($selectedDonor['phone']) ? ' · ' . e((string)$selectedDonor['phone']) : '' ?><?php endif; ?></div>
+            <div id="selected_donor_name" class="collect-selected-name-v5">
+                <?= e((string)($selectedDonor['name'] ?? 'No donor selected')) ?>
+            </div>
+            <div id="selected_donor_meta" class="collect-selected-meta-v5">
+                <?php if ($selectedDonor): ?>
+                    ID <?= (int)$selectedDonor['ID'] ?>
+                    <?= !empty($selectedDonor['city']) ? ' · ' . e((string)$selectedDonor['city']) : '' ?>
+                    <?= !empty($selectedDonor['phone']) ? ' · ' . e((string)$selectedDonor['phone']) : '' ?>
+                <?php endif; ?>
+            </div>
         </div>
 
         <div id="collect_fields_section" class="<?= $selectedDonor ? '' : 'is-disabled' ?>">
             <div id="category_start_v5" class="section-title">Category</div>
             <div class="collect-category-grid-v5" id="category_grid">
-                <?php foreach (['one_time'=>['🎁','One Time'],'monthly'=>['🗓️','Monthly'],'event'=>['🎉','Event'],'loan'=>['🤝','Loan']] as $value => [$icon, $label]): ?>
-                <label class="collect-card-option-v5"><input type="radio" name="category" value="<?= e($value) ?>" <?= (string)tx_old('category', '') === $value ? 'checked' : '' ?>><span class="collect-card-pill-v5"><span class="icon"><?= $icon ?></span><span><?= e($label) ?></span></span></label>
+                <?php foreach ([
+                    'one_time' => ['🎁', 'One Time'],
+                    'monthly'  => ['🗓️', 'Monthly'],
+                    'event'    => ['🎉', 'Event'],
+                    'loan'     => ['🤝', 'Loan']
+                ] as $value => [$icon, $label]): ?>
+                    <label class="collect-card-option-v5">
+                        <input type="radio" name="category" value="<?= e($value) ?>" <?= (string)tx_old('category', '') === $value ? 'checked' : '' ?>>
+                        <span class="collect-card-pill-v5">
+                            <span class="icon"><?= $icon ?></span>
+                            <span><?= e($label) ?></span>
+                        </span>
+                    </label>
                 <?php endforeach; ?>
             </div>
 
             <div id="event_fields" class="stack compact collect-conditional-v5<?= (string)tx_old('category', '') === 'event' ? '' : ' hidden' ?>">
                 <label>Event</label>
-                <select name="event_id"><option value="0">Select event</option><?php foreach ($events as $ev): ?><option value="<?= (int)$ev['ID'] ?>" <?= (int)tx_old('event_id', 0) === (int)$ev['ID'] ? 'selected' : '' ?>><?= e((string)$ev['name']) ?></option><?php endforeach; ?></select>
+                <select name="event_id">
+                    <option value="0">Select event</option>
+                    <?php foreach ($events as $ev): ?>
+                        <option value="<?= (int)$ev['ID'] ?>" <?= (int)tx_old('event_id', 0) === (int)$ev['ID'] ? 'selected' : '' ?>>
+                            <?= e((string)$ev['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div id="loan_fields" class="stack compact collect-conditional-v5<?= (string)tx_old('category', '') === 'loan' ? '' : ' hidden' ?>">
-                <label>Loan Category</label>
-                <select name="loan_category"><option value="">Select loan category</option><?php foreach ($loanCategories as $lc): ?><option value="<?= e($lc) ?>" <?= (string)tx_old('loan_category', '') === $lc ? 'selected' : '' ?>><?= e(ucwords(str_replace('_', ' ', $lc))) ?></option><?php endforeach; ?></select>
+                <div class="section-title">Loan Type</div>
+                <div class="collect-loan-type-grid-v5">
+                    <?php foreach ([
+                        'Provide' => ['⬅️', 'Provide', 'Mosque gives money out'],
+                        'Receive' => ['➡️', 'Receive', 'Mosque receives loan']
+                    ] as $value => [$icon, $label, $desc]): ?>
+                        <label class="collect-card-option-v5">
+                            <input type="radio" name="loan_type" value="<?= e($value) ?>" <?= (string)tx_old('loan_type', '') === $value ? 'checked' : '' ?>>
+                            <span class="collect-card-pill-v5 collect-loan-pill-v5">
+                                <span class="icon"><?= $icon ?></span>
+                                <span><?= e($label) ?></span>
+                                <small><?= e($desc) ?></small>
+                            </span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="collect-loan-grid-v5">
+                    <div>
+                        <label>Loan Title / Purpose</label>
+                        <input
+                            type="text"
+                            name="loan_title"
+                            value="<?= e((string)tx_old('loan_title', '')) ?>"
+                            placeholder="e.g. Mosque renovation support"
+                        >
+                    </div>
+                    <div>
+                        <label>Expected Return Date</label>
+                        <input
+                            type="date"
+                            name="loan_return_date"
+                            value="<?= e((string)tx_old('loan_return_date', '')) ?>"
+                        >
+                    </div>
+                </div>
             </div>
 
             <div class="section-title">Amount</div>
             <div class="stack compact">
-                <input type="number" step="0.01" min="0.01" name="amount" id="amount_input_v5" value="<?= e((string)tx_old('amount', '')) ?>" placeholder="0.00">
-                <div class="collect-amount-row-v5"><?php foreach ([10,20,50,100,500,1000] as $inc): ?><button type="button" class="collect-mini-card-v5 amount-add-btn" data-add="<?= $inc ?>">+<?= $inc ?></button><?php endforeach; ?></div>
+                <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    name="amount"
+                    id="amount_input_v5"
+                    value="<?= e((string)tx_old('amount', '')) ?>"
+                    placeholder="0.00"
+                >
+                <div class="collect-amount-row-v5">
+                    <?php foreach ([10, 20, 50, 100, 500, 1000] as $inc): ?>
+                        <button type="button" class="collect-mini-card-v5 amount-add-btn" data-add="<?= $inc ?>">+<?= $inc ?></button>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
             <div class="section-title">Payment Method</div>
-            <div class="collect-payment-row-v5"><?php foreach (['cash'=>['💵','Cash'],'bank'=>['🏦','Bank'],'pos'=>['💳','POS'],'stripe'=>['💠','Stripe'],'online'=>['🌐','Online']] as $value => [$icon, $label]): ?><label class="collect-card-option-v5 collect-payment-option-v5"><input type="radio" name="payment_method" value="<?= e($value) ?>" <?= (string)tx_old('payment_method', 'cash') === $value ? 'checked' : '' ?>><span class="collect-card-pill-v5"><span class="icon"><?= $icon ?></span><span><?= e($label) ?></span></span></label><?php endforeach; ?></div>
+            <div class="collect-payment-row-v5">
+                <?php foreach ([
+                    'cash'   => ['💵', 'Cash'],
+                    'bank'   => ['🏦', 'Bank'],
+                    'pos'    => ['💳', 'POS'],
+                    'stripe' => ['💠', 'Stripe'],
+                    'online' => ['🌐', 'Online']
+                ] as $value => [$icon, $label]): ?>
+                    <label class="collect-card-option-v5 collect-payment-option-v5">
+                        <input type="radio" name="payment_method" value="<?= e($value) ?>" <?= (string)tx_old('payment_method', 'cash') === $value ? 'checked' : '' ?>>
+                        <span class="collect-card-pill-v5">
+                            <span class="icon"><?= $icon ?></span>
+                            <span><?= e($label) ?></span>
+                        </span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
 
             <div class="section-title">Donation Source</div>
             <div class="stack compact">
@@ -318,11 +703,21 @@ require_once __DIR__ . '/includes/header.php';
             </div>
 
             <div class="collect-date-notes-grid-v5">
-                <div><label>Date</label><input type="date" name="transaction_date" value="<?= e((string)tx_old('transaction_date', date('Y-m-d'))) ?>"></div>
-                <div><label>Notes</label><input type="text" name="notes" value="<?= e((string)tx_old('notes', '')) ?>" placeholder="Optional note"></div>
+                <div>
+                    <label>Date</label>
+                    <input type="date" name="transaction_date" value="<?= e((string)tx_old('transaction_date', date('Y-m-d'))) ?>">
+                </div>
+                <div>
+                    <label>Notes</label>
+                    <input type="text" name="notes" value="<?= e((string)tx_old('notes', '')) ?>" placeholder="Optional note">
+                </div>
             </div>
 
-            <div class="toolbar collect-toolbar-v5"><button type="submit" class="btn btn-primary">Save Donation</button></div>
+            <div class="toolbar collect-toolbar-v5">
+                <button type="submit" class="btn btn-primary">
+                    <?= (string)tx_old('category', '') === 'loan' ? 'Save Loan' : 'Save Donation' ?>
+                </button>
+            </div>
         </div>
     </form>
 </div>
@@ -337,53 +732,76 @@ require_once __DIR__ . '/includes/header.php';
     const fieldSection = document.getElementById('collect_fields_section');
     const sourceToggle = document.getElementById('collected_for_others');
     const sourceFields = document.getElementById('source_fields');
+    const saveButton = document.querySelector('.collect-toolbar-v5 button[type="submit"]');
 
-    function enableFields(){ fieldSection.classList.remove('is-disabled'); selectedBox.classList.add('is-selected'); }
-    function goCategory(){ const target = document.getElementById('category_start_v5'); if (target) target.scrollIntoView({behavior:'smooth', block:'start'}); }
+    function enableFields() {
+        fieldSection.classList.remove('is-disabled');
+        selectedBox.classList.add('is-selected');
+    }
 
-    function selectDonor(id,name,city,phone){
-        personInput.value=id;
-        selectedName.textContent=name||'Selected donor';
-        selectedMeta.textContent=['ID '+id, city||'', phone||''].filter(Boolean).join(' · ');
-        enableFields();
-        if(resultWrap){
-            resultWrap.innerHTML='';
-            resultWrap.style.display='none';
+    function goCategory() {
+        const target = document.getElementById('category_start_v5');
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+    }
+
+    function selectDonor(id, name, city, phone) {
+        personInput.value = id;
+        selectedName.textContent = name || 'Selected donor';
+        selectedMeta.textContent = ['ID ' + id, city || '', phone || ''].filter(Boolean).join(' · ');
+        enableFields();
+
+        if (resultWrap) {
+            resultWrap.innerHTML = '';
+            resultWrap.style.display = 'none';
+        }
+
         goCategory();
     }
 
     if (resultWrap) {
-        resultWrap.addEventListener('click', function(e){
-            const btn=e.target.closest('.collect-donor-result-v5');
-            if(!btn) return;
+        resultWrap.addEventListener('click', function (e) {
+            const btn = e.target.closest('.collect-donor-result-v5');
+            if (!btn) return;
+
             e.preventDefault();
-            selectDonor(btn.dataset.donorId||'', btn.dataset.donorName||'', btn.dataset.donorCity||'', btn.dataset.donorPhone||'');
+            selectDonor(
+                btn.dataset.donorId || '',
+                btn.dataset.donorName || '',
+                btn.dataset.donorCity || '',
+                btn.dataset.donorPhone || ''
+            );
         });
     }
 
-    document.querySelectorAll('.amount-add-btn').forEach(function(btn){
-        btn.addEventListener('click', function(){
-            const input=document.getElementById('amount_input_v5');
-            const add=parseFloat(btn.dataset.add||'0');
-            const current=parseFloat(input.value||'0');
-            input.value=(current+add).toFixed(2);
+    document.querySelectorAll('.amount-add-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const input = document.getElementById('amount_input_v5');
+            const add = parseFloat(btn.dataset.add || '0');
+            const current = parseFloat(input.value || '0');
+            input.value = (current + add).toFixed(2);
         });
     });
 
-    function syncConditionalFields(){
-        const selected=document.querySelector('input[name="category"]:checked');
-        const val=selected?selected.value:'';
-        document.getElementById('event_fields').classList.toggle('hidden', val!=='event');
-        document.getElementById('loan_fields').classList.toggle('hidden', val!=='loan');
+    function syncConditionalFields() {
+        const selected = document.querySelector('input[name="category"]:checked');
+        const val = selected ? selected.value : '';
+
+        document.getElementById('event_fields').classList.toggle('hidden', val !== 'event');
+        document.getElementById('loan_fields').classList.toggle('hidden', val !== 'loan');
+
+        if (saveButton) {
+            saveButton.textContent = val === 'loan' ? 'Save Loan' : 'Save Donation';
+        }
     }
 
-    function syncSourceFields(){
-        if(!sourceToggle || !sourceFields) return;
+    function syncSourceFields() {
+        if (!sourceToggle || !sourceFields) return;
         sourceFields.classList.toggle('hidden', !sourceToggle.checked);
     }
 
-    document.querySelectorAll('input[name="category"]').forEach(function(radio){
+    document.querySelectorAll('input[name="category"]').forEach(function (radio) {
         radio.addEventListener('change', syncConditionalFields);
     });
 
@@ -400,4 +818,5 @@ require_once __DIR__ . '/includes/header.php';
     }
 })();
 </script>
+
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
