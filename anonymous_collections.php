@@ -224,6 +224,7 @@ foreach ($summaryStmt->fetchAll() as $row) {
 
 require_once __DIR__ . '/includes/header.php';
 ?>
+
 <div class="page-head">
     <div>
         <h1 class="title">Anonymous Collections</h1>
@@ -249,6 +250,7 @@ require_once __DIR__ . '/includes/header.php';
         <div class="section-head">
             <h2>New Collection</h2>
         </div>
+
         <form method="post" class="stack" id="anonymousCollectionForm">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="save_collection">
@@ -294,7 +296,10 @@ require_once __DIR__ . '/includes/header.php';
                     <?php foreach ($paymentMethods as $method): ?>
                         <label class="payment-option">
                             <input type="radio" name="payment_method" value="<?= e($method) ?>" <?= $method === $selectedMethod ? 'checked' : '' ?>>
-                            <span class="payment-chip"><span class="payment-chip-icon"><?= e(anonymousCollectionMethodIcon($method)) ?></span><span class="payment-chip-text"><?= e(anonymousCollectionMethodLabel($method)) ?></span></span>
+                            <span class="payment-chip">
+                                <span class="payment-chip-icon"><?= e(anonymousCollectionMethodIcon($method)) ?></span>
+                                <span class="payment-chip-text"><?= e(anonymousCollectionMethodLabel($method)) ?></span>
+                            </span>
                         </label>
                     <?php endforeach; ?>
                 </div>
@@ -363,40 +368,81 @@ require_once __DIR__ . '/includes/header.php';
                 <h2>Recent Entries</h2>
                 <span class="muted">Latest 50</span>
             </div>
-            <div class="table-wrap recent-wrap">
-                <table class="responsive-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Box</th>
-                            <th>Amount</th>
-                            <th>Method</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($recentRows as $row): ?>
+
+            <?php if (!$recentRows): ?>
+                <div class="muted">No anonymous collections yet.</div>
+            <?php else: ?>
+
+                <div class="recent-entries-desktop table-wrap recent-wrap">
+                    <table class="responsive-table">
+                        <thead>
                             <tr>
-                                <td data-label="Date"><?= e(function_exists('formatDateTimeDisplay') ? formatDateTimeDisplay((string)$row['created_at']) : date('d/m/Y H:i', strtotime((string)$row['created_at']))) ?></td>
-                                <td data-label="Type"><?= e(anonymousCollectionTypeLabel((string)$row['collection_type'])) ?></td>
-                                <td data-label="Box">
-                                    <?php if (!empty($row['box_number'])): ?>
-                                        <?= e((string)$row['box_number']) ?>
-                                        <?php if (trim((string)($row['box_title'] ?? '')) !== ''): ?>
-                                            <div class="muted"><?= e((string)$row['box_title']) ?></div>
-                                        <?php endif; ?>
-                                    <?php else: ?>—<?php endif; ?>
-                                </td>
-                                <td data-label="Amount"><?= money((float)$row['amount']) ?></td>
-                                <td data-label="Method"><?= e(anonymousCollectionMethodLabel((string)($row['payment_method'] ?? 'cash'))) ?></td>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Box</th>
+                                <th>Amount</th>
+                                <th>Method</th>
                             </tr>
-                        <?php endforeach; ?>
-                        <?php if (!$recentRows): ?>
-                            <tr><td colspan="5" class="muted">No anonymous collections yet.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recentRows as $row): ?>
+                                <tr>
+                                    <td>
+                                        <?= e(function_exists('formatDateTimeDisplay') ? formatDateTimeDisplay((string)$row['created_at']) : date('d/m/Y H:i', strtotime((string)$row['created_at']))) ?>
+                                    </td>
+                                    <td>
+                                        <?= e(anonymousCollectionTypeLabel((string)$row['collection_type'])) ?>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($row['box_number'])): ?>
+                                            <?= e((string)$row['box_number']) ?>
+                                            <?php if (trim((string)($row['box_title'] ?? '')) !== ''): ?>
+                                                <div class="muted"><?= e((string)$row['box_title']) ?></div>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            —
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= money((float)$row['amount']) ?></td>
+                                    <td><?= e(anonymousCollectionMethodLabel((string)($row['payment_method'] ?? 'cash'))) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="recent-entries-mobile">
+                    <?php foreach ($recentRows as $row): ?>
+                        <div class="recent-entry-card">
+                            <div class="recent-entry-type">
+                                <div class="recent-entry-label">Type</div>
+                                <div class="recent-entry-value">
+                                    <?= e(anonymousCollectionTypeLabel((string)$row['collection_type'])) ?>
+                                </div>
+                            </div>
+
+                            <div class="recent-entry-amount">
+                                <div class="recent-entry-label">Amount</div>
+                                <div class="recent-entry-value">
+                                    <?= money((float)$row['amount']) ?>
+                                </div>
+                            </div>
+
+                            <div class="recent-entry-method">
+                                <div class="recent-entry-label">Method</div>
+                                <div class="recent-entry-value">
+                                    <?= e(anonymousCollectionMethodLabel((string)($row['payment_method'] ?? 'cash'))) ?>
+                                </div>
+                            </div>
+
+                            <div class="recent-entry-date">
+                                <?= e(function_exists('formatDateTimeDisplay') ? formatDateTimeDisplay((string)$row['created_at']) : date('d/m/Y H:i', strtotime((string)$row['created_at']))) ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+            <?php endif; ?>
         </div>
     </section>
 </div>

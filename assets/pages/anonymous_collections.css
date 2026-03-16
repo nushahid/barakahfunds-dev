@@ -1,9 +1,9 @@
-
 .page-anonymous-collections .main {
     display: flex;
     flex-direction: column;
     gap: 18px;
 }
+
 .page-head {
     display: flex;
     align-items: flex-start;
@@ -11,38 +11,51 @@
     gap: 14px;
     flex-wrap: wrap;
 }
-.anon-subtitle { margin: 4px 0 0; }
+
+.anon-subtitle {
+    margin: 4px 0 0;
+}
+
 .anon-summary-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
 }
-.summary-card { padding: 16px; }
+
+.summary-card {
+    padding: 16px;
+}
+
 .summary-label {
     font-size: 13px;
     color: #64748b;
     margin-bottom: 8px;
 }
+
 .summary-value {
     font-size: 24px;
     font-weight: 800;
     line-height: 1.15;
 }
+
 .anon-layout-grid {
     display: grid;
     grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
     gap: 18px;
     align-items: start;
 }
+
 .anon-layout-grid-operator {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
+
 .stack {
     display: flex;
     flex-direction: column;
     gap: 16px;
     min-width: 0;
 }
+
 .section-head {
     display: flex;
     justify-content: space-between;
@@ -51,28 +64,36 @@
     margin-bottom: 12px;
     flex-wrap: wrap;
 }
-.section-head h2 { margin: 0; }
+
+.section-head h2 {
+    margin: 0;
+}
+
 .field-label {
     display: block;
     margin-bottom: 7px;
     font-weight: 600;
 }
+
 .type-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
 }
+
 .type-option,
 .payment-option {
     position: relative;
     display: block;
 }
+
 .type-option input,
 .payment-option input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
+
 .type-chip {
     display: flex;
     flex-direction: column;
@@ -87,30 +108,39 @@
     text-align: center;
     transition: all .15s ease;
 }
+
 .type-chip strong {
     font-size: 30px;
     line-height: 1;
 }
+
 .type-chip span {
     font-size: 15px;
     font-weight: 700;
 }
+
 .type-option input:checked + .type-chip {
     border-color: #0f766e;
     box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
     background: #f0fdfa;
 }
-.box-field[hidden] { display: none !important; }
+
+.box-field[hidden] {
+    display: none !important;
+}
+
 .inline-note {
     margin-top: 8px;
     font-size: 13px;
     color: #64748b;
 }
+
 .payment-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
 }
+
 .payment-chip {
     display: flex;
     align-items: center;
@@ -127,25 +157,30 @@
     transition: all .15s ease;
     white-space: nowrap;
 }
+
 .payment-chip-icon {
     font-size: 15px;
     line-height: 1;
 }
+
 .payment-chip-text {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 .payment-option input:checked + .payment-chip {
     border-color: #0f766e;
     box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
     background: #f0fdfa;
 }
+
 .quick-amounts {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 10px;
 }
+
 .quick-amount-btn {
     border: 1px solid #dbe2ea;
     border-radius: 999px;
@@ -154,18 +189,56 @@
     font-weight: 700;
     cursor: pointer;
 }
+
 .clear-btn {
     background: #fff7ed;
     border-color: #fed7aa;
 }
+
 .table-wrap {
     width: 100%;
     overflow-x: auto;
 }
+
 .recent-wrap table {
     width: 100%;
     min-width: 640px;
 }
+
+/* Recent entries custom layout */
+.recent-entries-mobile {
+    display: none;
+}
+
+.recent-entry-card {
+    border: 1px solid #d9dde3;
+    border-radius: 16px;
+    background: #fff;
+    padding: 14px;
+}
+
+.recent-entry-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    line-height: 1.2;
+}
+
+.recent-entry-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    line-height: 1.3;
+}
+
+.recent-entry-date {
+    text-align: right;
+    font-size: 12px;
+    color: #6b7280;
+}
+
 @media (max-width: 980px) {
     .anon-summary-grid,
     .anon-layout-grid,
@@ -173,39 +246,49 @@
         grid-template-columns: 1fr;
     }
 }
+
 @media (max-width: 640px) {
     .page-head {
         gap: 10px;
     }
+
     .anon-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
+
     .summary-card {
         padding: 12px;
     }
+
     .summary-value {
         font-size: 18px;
     }
+
     .type-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
+
     .type-chip {
         min-height: 112px;
         padding: 18px 10px;
     }
+
     .type-chip strong {
         font-size: 32px;
     }
+
     .type-chip span {
         font-size: 16px;
         line-height: 1.2;
     }
+
     .payment-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 6px;
     }
+
     .payment-chip {
         min-height: 48px;
         padding: 8px 4px;
@@ -214,9 +297,11 @@
         flex-direction: column;
         line-height: 1.05;
     }
+
     .payment-chip-icon {
         font-size: 14px;
     }
+
     .payment-chip-text {
         max-width: 100%;
         overflow: visible;
@@ -224,15 +309,20 @@
         white-space: normal;
         word-break: break-word;
     }
+
     .quick-amounts {
         gap: 6px;
     }
+
     .quick-amount-btn {
         padding: 8px 10px;
     }
+
     .recent-wrap {
         overflow: visible;
     }
+
+    /* keep other responsive tables as cards */
     .responsive-table,
     .responsive-table thead,
     .responsive-table tbody,
@@ -242,22 +332,27 @@
         display: block;
         width: 100%;
     }
+
     .responsive-table {
         min-width: 0 !important;
     }
+
     .responsive-table thead {
         display: none;
     }
+
     .responsive-table tbody {
         display: grid;
         gap: 12px;
     }
+
     .responsive-table tr {
         border: 1px solid #e5e7eb;
         border-radius: 14px;
         padding: 10px 12px;
         background: #fff;
     }
+
     .responsive-table td {
         border: 0;
         padding: 6px 0;
@@ -265,6 +360,7 @@
         white-space: normal;
         word-break: break-word;
     }
+
     .responsive-table td::before {
         content: attr(data-label);
         display: block;
@@ -274,5 +370,45 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .02em;
+    }
+
+    /* recent entries: use custom cards instead of responsive table */
+    .recent-entries-desktop {
+        display: none;
+    }
+
+    .recent-entries-mobile {
+        display: grid;
+        gap: 12px;
+    }
+
+    .recent-entry-card {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 12px;
+    }
+
+    .recent-entry-type {
+        grid-column: 1 / -1;
+    }
+
+    .recent-entry-amount,
+    .recent-entry-method {
+        grid-column: span 1;
+    }
+
+    .recent-entry-date {
+        grid-column: 1 / -1;
+        padding-top: 2px;
+    }
+}
+
+@media (min-width: 641px) {
+    .recent-entries-desktop {
+        display: block;
+    }
+
+    .recent-entries-mobile {
+        display: none;
     }
 }

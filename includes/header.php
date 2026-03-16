@@ -22,6 +22,7 @@ $menu = [
     ['file' => 'payment_adjustments.php', 'label' => 'Payment Adjustments', 'icon' => '🛠️', 'roles' => ['accountant']],
     ['file' => 'event_page.php', 'label' => 'Events', 'icon' => '🎉', 'roles' => ['accountant','admin']],
     ['file' => 'loan_page.php', 'label' => 'Loans', 'icon' => '🤝', 'roles' => ['accountant','admin']],
+    ['file' => 'transaction_delete_requests.php', 'label' => 'Revew Delete Requests', 'icon' => '🤝', 'roles' => ['accountant','admin']],
     ['file' => 'expense_categories.php', 'label' => 'Expense Categories', 'icon' => '🗂️', 'roles' => ['accountant','admin']],
     ['file' => 'death_societies.php', 'label' => 'Death Societies', 'icon' => '🕊️', 'roles' => ['accountant','admin']],
     ['file' => 'mosque_settings.php', 'label' => 'Mosque Settings', 'icon' => '🕌', 'roles' => ['admin']],
