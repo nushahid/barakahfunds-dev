@@ -188,3 +188,22 @@ body.page-person-profile .mobile-activity-notes-v5{
         font-size:20px;
     }
 }
+
+
+body.page-person-profile .person-info-note-v5{
+    margin-top:16px;
+    padding:14px 16px;
+    border:1px solid #fdba74;
+    border-radius:16px;
+    background:#fff7ed;
+    color:#9a3412;
+    line-height:1.5;
+}
+
+body.page-person-profile .person-side-note-v5{
+    margin-top:12px;
+    padding:12px 14px;
+    border:1px solid #bfdbfe;
+    border-radius:16px;
+    background:#ffffff;
+}

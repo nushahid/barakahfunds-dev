@@ -14,7 +14,7 @@ $menu = [
     ['file' => 'transaction_page.php', 'label' => 'Collect Donation', 'icon' => '💝', 'roles' => ['operator','accountant']],
     ['file' => 'transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['operator']],
     ['file' => 'all_transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['accountant']],
-    ['file' => 'expense_page.php', 'label' => 'Add Expense', 'icon' => '💸', 'roles' => ['operator']],
+    ['file' => 'add_expense.php', 'label' => 'Add Expense', 'icon' => '💸', 'roles' => ['operator']],
     ['file' => 'anonymous_collections.php', 'label' => 'Anonymous Collections', 'icon' => '📦', 'roles' => ['operator','accountant']],
     ['file' => 'donation_boxes.php', 'label' => 'Donation Boxes', 'icon' => '🗃️', 'roles' => ['operator','accountant','admin']],
     ['file' => 'transfer_requests.php', 'label' => 'Transfers', 'icon' => '🔄', 'roles' => ['operator','accountant']],

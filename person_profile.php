@@ -44,6 +44,7 @@ $hasSourceColumns = function_exists('columnExists')
     && columnExists($pdo, 'operator_ledger', 'contributor_count')
     && columnExists($pdo, 'operator_ledger', 'source_note');
 
+$donationRows = [];
 if (tableExists($pdo, 'operator_ledger')) {
     if ($hasSourceColumns) {
         $stmt = $pdo->prepare('
@@ -60,32 +61,12 @@ if (tableExists($pdo, 'operator_ledger')) {
                 source_note
             FROM operator_ledger
             WHERE person_id = ?
+              AND amount >= 0
             ORDER BY ID DESC
             LIMIT 100
         ');
         $stmt->execute([$id]);
-        $transactions = $stmt->fetchAll();
-
-        $stmt = $pdo->prepare('
-            SELECT
-                ID,
-                created_at AS date,
-                transaction_category AS cat,
-                amount,
-                payment_method AS method,
-                notes,
-                invoice_no,
-                source_type,
-                contributor_count,
-                source_note
-            FROM operator_ledger
-            WHERE person_id = ?
-              AND created_at >= ?
-            ORDER BY ID DESC
-            LIMIT 100
-        ');
-        $stmt->execute([$id, $mobileCutoff]);
-        $mobileTransactions = $stmt->fetchAll();
+        $donationRows = $stmt->fetchAll();
     } else {
         $stmt = $pdo->prepare('
             SELECT
@@ -98,63 +79,101 @@ if (tableExists($pdo, 'operator_ledger')) {
                 invoice_no
             FROM operator_ledger
             WHERE person_id = ?
+              AND amount >= 0
             ORDER BY ID DESC
             LIMIT 100
         ');
         $stmt->execute([$id]);
-        $transactions = $stmt->fetchAll();
-
-        $stmt = $pdo->prepare('
-            SELECT
-                ID,
-                created_at AS date,
-                transaction_category AS cat,
-                amount,
-                payment_method AS method,
-                notes,
-                invoice_no
-            FROM operator_ledger
-            WHERE person_id = ?
-              AND created_at >= ?
-            ORDER BY ID DESC
-            LIMIT 100
-        ');
-        $stmt->execute([$id, $mobileCutoff]);
-        $mobileTransactions = $stmt->fetchAll();
+        $donationRows = $stmt->fetchAll();
     }
 }
 
-foreach ($transactions as $t) {
+foreach ($donationRows as $t) {
     $amountValue = (float)$t['amount'];
-    $categoryValue = strtolower(trim((string)($t['cat'] ?? '')));
-    $notesValue = strtolower((string)($t['notes'] ?? ''));
+    $totalIn += $amountValue;
 
-    $isInformationalDonation = (
-        $categoryValue === 'donation_value'
-        || str_contains($notesValue, 'informational donation only')
-    );
-
-    if ($isInformationalDonation) {
-        $localDonationValueTotal += abs($amountValue);
-        continue;
-    }
-
-    if ($amountValue >= 0) {
-        $totalIn += $amountValue;
-
-        if ($hasSourceColumns) {
-            if (($t['source_type'] ?? 'self') === 'group_collected') {
-                $collectedDonationTotal += $amountValue;
-            } else {
-                $selfDonationTotal += $amountValue;
-            }
-        } else {
-            $selfDonationTotal += $amountValue;
-        }
+    if ($hasSourceColumns && ($t['source_type'] ?? 'self') === 'group_collected') {
+        $collectedDonationTotal += $amountValue;
     } else {
-        $totalOut += abs($amountValue);
+        $selfDonationTotal += $amountValue;
     }
 }
+
+$expenseRows = [];
+if (tableExists($pdo, 'expense')) {
+    $hasPaymentMethod = function_exists('columnExists') && columnExists($pdo, 'expense', 'payment_method');
+    $hasExpenseDate = function_exists('columnExists') && columnExists($pdo, 'expense', 'expense_date');
+    $hasDonationFlag = function_exists('columnExists') && columnExists($pdo, 'expense', 'donation');
+
+    $methodSelect = $hasPaymentMethod ? 'e.payment_method' : "''";
+    $dateSelect = $hasExpenseDate ? 'e.expense_date' : 'DATE(e.created_at)';
+    $donationSelect = $hasDonationFlag ? 'e.donation' : '0';
+
+    $stmt = $pdo->prepare(" 
+        SELECT
+            e.ID,
+            {$dateSelect} AS date,
+            COALESCE(ec.category_name, CONCAT('Category #', e.exp_cat)) AS cat,
+            e.name AS item_name,
+            e.amount,
+            {$methodSelect} AS method,
+            e.notes,
+            NULL AS invoice_no,
+            {$donationSelect} AS donation_flag,
+            e.created_at
+        FROM expense e
+        LEFT JOIN expense_categories ec ON ec.ID = e.exp_cat
+        WHERE e.pid = ?
+        ORDER BY e.created_at DESC, e.ID DESC
+        LIMIT 100
+    ");
+    $stmt->execute([$id]);
+    $expenseRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+foreach ($expenseRows as $row) {
+    $isSponsored = (int)($row['donation_flag'] ?? 0) === 1;
+    if ($isSponsored) {
+        $localDonationValueTotal += (float)$row['amount'];
+    } else {
+        $totalOut += (float)$row['amount'];
+    }
+}
+
+$transactions = array_merge(
+    array_map(static function (array $row): array {
+        return [
+            'date' => $row['date'],
+            'invoice_no' => $row['invoice_no'] ?? null,
+            'cat' => $row['cat'],
+            'amount' => (float)$row['amount'],
+            'method' => $row['method'] ?? '',
+            'notes' => $row['notes'] ?? '',
+            'sort_date' => strtotime((string)$row['date']) ?: 0,
+        ];
+    }, $donationRows),
+    array_map(static function (array $row): array {
+        $isSponsored = (int)($row['donation_flag'] ?? 0) === 1;
+        return [
+            'date' => $row['date'],
+            'invoice_no' => null,
+            'cat' => $isSponsored ? 'Sponsored Expense' : 'Expense',
+            'amount' => (float)$row['amount'],
+            'method' => $row['method'] ?? ($isSponsored ? 'no-cash' : ''),
+            'notes' => trim((string)($row['item_name'] ?? '') . (!empty($row['notes']) ? ' | ' . (string)$row['notes'] : '')),
+            'sort_date' => strtotime((string)$row['date']) ?: 0,
+        ];
+    }, $expenseRows)
+);
+
+usort($transactions, static function (array $a, array $b): int {
+    return ($b['sort_date'] <=> $a['sort_date']);
+});
+
+$mobileTransactions = array_values(array_filter($transactions, static function (array $row) use ($mobileCutoff): bool {
+    return strtotime((string)$row['date']) >= strtotime($mobileCutoff);
+}));
+$mobileTransactions = array_slice($mobileTransactions, 0, 100);
 
 $dueMonths = monthlyOutstandingMonths($pdo, $id);
 
@@ -172,7 +191,8 @@ function profileMethodLabel(string $method): string {
         'pos' => 'POS',
         'stripe_auto', 'stripe' => 'Stripe',
         'online' => 'Online',
-        default => ucwords(str_replace('_', ' ', $method)),
+        'no-cash' => 'No Cash',
+        default => $method !== '' ? ucwords(str_replace('_', ' ', $method)) : '—',
     };
 }
 
@@ -180,7 +200,7 @@ $pageClass = 'page-person-profile';
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<h1 class="title">Donation &amp; Activity Ledger</h1>
+<h1 class="title">Donor Profile &amp; Activity Ledger</h1>
 
 <div class="person-profile-v5">
     <div class="person-profile-main-v5">
@@ -203,9 +223,12 @@ require_once __DIR__ . '/includes/header.php';
 
             <div class="person-actions-v5">
                 <a class="btn btn-primary" href="transaction_page.php?person_id=<?= (int)$person['ID'] ?>#category_start_v5">Collect Donation</a>
-                <a class="btn" href="add_expense.php?person_id=<?= (int)$person['ID'] ?>">Add Expense</a>
-                <a class="btn" href="add_donation.php?person_id=<?= (int)$person['ID'] ?>">Add Donation</a>
+                <a class="btn" href="add_expense.php?person_id=<?= (int)$person['ID'] ?>">Add Expense / Sponsored Expense</a>
                 <a class="btn" href="public_donor_report.php?id=<?= (int)$person['ID'] ?>">Open Public Report</a>
+            </div>
+
+            <div class="person-info-note-v5">
+                <strong>Reference donor note:</strong> Expenses added from this profile are operator-handled records. The selected donor is only a reference for reporting. This does not mean the donor personally paid or made the expense.
             </div>
         </div>
 
@@ -219,20 +242,16 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="summary"><?= money($selfDonationTotal) ?></div>
             </div>
             <div class="card person-summary-card-v5">
-                <div class="muted">Collected for Others</div>
+                <div class="muted">Collected from Others</div>
                 <div class="summary"><?= money($collectedDonationTotal) ?></div>
             </div>
             <div class="card person-summary-card-v5">
-                <div class="muted">Total Expense</div>
+                <div class="muted">Operator-handled Expense</div>
                 <div class="summary"><?= money($totalOut) ?></div>
             </div>
             <div class="card person-summary-card-v5">
-                <div class="muted">Local Cards / Donation Value</div>
+                <div class="muted">Sponsored / Informational Value</div>
                 <div class="summary"><?= money($localDonationValueTotal) ?></div>
-            </div>
-            <div class="card person-summary-card-v5">
-                <div class="muted">Net</div>
-                <div class="summary"><?= money($totalIn - $totalOut) ?></div>
             </div>
             <div class="card person-summary-card-v5">
                 <div class="muted">Monthly Agreed</div>
@@ -272,6 +291,7 @@ require_once __DIR__ . '/includes/header.php';
                 <img src="<?= e($publicQr) ?>" alt="Donor public report QR" width="220" height="220">
             </div>
             <div class="helper">If the QR does not scan on some phones, use the public link below. Anyone can open the page and verify with the last 3 digits of the donor phone number.</div>
+            <div class="helper person-side-note-v5">Sponsored expense values linked to this donor are reference-only records for reports. They do not mean this donor directly paid cash for the expense.</div>
             <div class="public-link-box-v5">
                 <a href="<?= e($publicUrl) ?>" target="_blank" rel="noopener"><?= e($publicUrl) ?></a>
             </div>
@@ -289,9 +309,9 @@ require_once __DIR__ . '/includes/header.php';
                             <th>Date</th>
                             <th>Invoice</th>
                             <th>Category</th>
-                            <th>Amount</th>
+                            <th>Amount / Value</th>
                             <th>Method</th>
-                            <th>Notes</th>
+                            <th>Notes / Clarification</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -318,7 +338,7 @@ require_once __DIR__ . '/includes/header.php';
                 <h2 class="section-head-v5" style="margin:0">Recent Activity</h2>
                 <span class="tag blue">Last 6 months</span>
             </div>
-            <div class="helper">Full activity ledger is shown on desktop view.</div>
+            <div class="helper">Full activity ledger is shown on desktop view. Sponsored expense entries shown here are reference-only and do not mean the donor directly paid the expense.</div>
 
             <div class="mobile-activity-list-v5">
                 <?php foreach ($mobileTransactions as $row): ?>
