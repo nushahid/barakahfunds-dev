@@ -101,98 +101,6 @@ function tx_save_monthly_agreement(PDO $pdo, int $personId, float $amount, strin
     ')->execute([$personId, $amount, $mode, $uid, 'Auto-created from first monthly donation collection']);
 }
 
-function tx_create_loan_records(
-    PDO $pdo,
-    int $personId,
-    string $personName,
-    string $loanType,
-    string $loanTitle,
-    float $amount,
-    string $paymentMethod,
-    string $transactionDate,
-    string $returnDate,
-    string $notes,
-    int $uid
-): array {
-    if ($personId <= 0) {
-        throw new RuntimeException('Invalid person for loan.');
-    }
-
-    if ($amount <= 0) {
-        throw new RuntimeException('Loan amount must be greater than zero.');
-    }
-
-    if (!function_exists('tableExists') || !tableExists($pdo, 'loan')) {
-        throw new RuntimeException('loan table not found.');
-    }
-
-    if (!function_exists('tableExists') || !tableExists($pdo, 'loan_trans')) {
-        throw new RuntimeException('loan_trans table not found.');
-    }
-
-    $loanType = trim($loanType);
-    if (!in_array($loanType, ['Provide', 'Receive'], true)) {
-        throw new RuntimeException('Invalid loan type.');
-    }
-
-    $loanTitle = trim($loanTitle);
-    if ($loanTitle === '') {
-        throw new RuntimeException('Loan title/purpose is required.');
-    }
-
-    $loanNotes = trim($notes);
-    $loanCreatedAt = $transactionDate . ' 00:00:00';
-
-    $loanStmt = $pdo->prepare('
-        INSERT INTO loan
-        (pid, name, amount, received_date, return_date, returned, method, type, notes, uid, created_at)
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
-    ');
-    $loanStmt->execute([
-        $personId,
-        $loanTitle,
-        $amount,
-        $transactionDate,
-        $returnDate !== '' ? $returnDate : null,
-        $paymentMethod,
-        $loanType,
-        $loanNotes,
-        $uid,
-        $loanCreatedAt
-    ]);
-
-    $loanId = (int)$pdo->lastInsertId();
-
-    $transNoteParts = [];
-    $transNoteParts[] = $loanType === 'Provide' ? 'Loan provided by mosque' : 'Loan received by mosque';
-    $transNoteParts[] = 'Person: ' . $personName;
-    $transNoteParts[] = 'Title: ' . $loanTitle;
-    if ($loanNotes !== '') {
-        $transNoteParts[] = 'Notes: ' . $loanNotes;
-    }
-
-    $loanTransStmt = $pdo->prepare('
-        INSERT INTO loan_trans
-        (lid, amount, method, notes, uid, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ');
-    $loanTransStmt->execute([
-        $loanId,
-        $amount,
-        $paymentMethod,
-        implode(' | ', $transNoteParts),
-        $uid,
-        $loanCreatedAt
-    ]);
-
-    $loanTransId = (int)$pdo->lastInsertId();
-
-    return [
-        'loan_id' => $loanId,
-        'loan_trans_id' => $loanTransId,
-    ];
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '') === 'collect') {
     verifyCsrfOrFail();
 
@@ -204,15 +112,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
     $date = trim((string)($_POST['transaction_date'] ?? date('Y-m-d')));
     $eventId = (int)($_POST['event_id'] ?? 0);
 
-    $loanType = trim((string)($_POST['loan_type'] ?? ''));
-    $loanTitle = trim((string)($_POST['loan_title'] ?? ''));
-    $loanReturnDate = trim((string)($_POST['loan_return_date'] ?? ''));
 
     $isCollectedForOthers = (int)($_POST['collected_for_others'] ?? 0) === 1;
     $contributorCount = (int)($_POST['contributor_count'] ?? 0);
     $sourceNote = trim((string)($_POST['source_note'] ?? ''));
 
-    $allowedCategories = ['one_time', 'monthly', 'event', 'loan'];
+    $allowedCategories = ['one_time', 'monthly', 'event'];
     $allowedMethods = ['cash', 'bank', 'pos', 'stripe', 'online'];
 
     if ($selectedDonorId <= 0) {
@@ -239,13 +144,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
         $errors[] = 'Please select an event.';
     }
 
-    if ($category === 'loan' && !in_array($loanType, ['Provide', 'Receive'], true)) {
-        $errors[] = 'Please select loan type.';
-    }
-
-    if ($category === 'loan' && $loanTitle === '') {
-        $errors[] = 'Loan title / purpose is required.';
-    }
 
     if ($isCollectedForOthers && $contributorCount > 0 && $contributorCount < 2) {
         $errors[] = 'Contributor count must be at least 2.';
@@ -269,7 +167,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
             $ledgerCategory = $category;
             $ledgerTransactionType = 'credit';
             $descriptionBits = [];
-            $loanIds = null;
 
             if ($category === 'event') {
                 $eventStmt = $pdo->prepare('SELECT ID, name FROM events WHERE ID = ? LIMIT 1');
@@ -346,31 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                 $referenceId = (int)$pdo->lastInsertId();
             }
 
-            if ($category === 'loan') {
-                $loanIds = tx_create_loan_records(
-                    $pdo,
-                    $selectedDonorId,
-                    (string)$selectedDonor['name'],
-                    $loanType,
-                    $loanTitle,
-                    $amount,
-                    $paymentMethod,
-                    $date,
-                    $loanReturnDate,
-                    $notes,
-                    $uid
-                );
 
-                $referenceId = (int)$loanIds['loan_trans_id'];
-                $ledgerCategory = 'loan';
-                $ledgerTransactionType = $loanType === 'Provide' ? 'debit' : 'credit';
-
-                $descriptionBits[] = 'Loan Type: ' . $loanType;
-                $descriptionBits[] = 'Loan Title: ' . $loanTitle;
-                if ($loanReturnDate !== '') {
-                    $descriptionBits[] = 'Expected Return: ' . $loanReturnDate;
-                }
-            }
 
             if ($isCollectedForOthers) {
                 $descriptionBits[] = 'Collected on behalf of others';
@@ -458,28 +331,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                 systemLog(
                     $pdo,
                     $uid,
-                    $category === 'loan' ? 'loan' : 'donation',
+                    'donation',
                     'create',
-                    $category === 'loan' ? ('Created loan transaction: ' . $loanType) : ('Collected ' . $category . ' donation'),
+                    'Collected ' . $category . ' donation',
                     $ledgerId
                 );
             }
 
             if (function_exists('personLog')) {
-                $personAction = $category === 'loan'
-                    ? ('Loan ' . $loanType . ' of ' . number_format($amount, 2, '.', ''))
-                    : ('Collected ' . $category . ' donation of ' . number_format($amount, 2, '.', ''));
+                $personAction = 'Collected ' . $category . ' donation of ' . number_format($amount, 2, '.', '');
 
-                personLog($pdo, $uid, $selectedDonorId, $category === 'loan' ? 'loan' : 'donation', $personAction);
+                personLog($pdo, $uid, $selectedDonorId, 'donation', $personAction);
             }
 
             $pdo->commit();
 
             if (function_exists('setFlash')) {
-                setFlash('success', $category === 'loan' ? 'Loan saved successfully.' : 'Donation saved successfully.');
+                setFlash('success', 'Donation saved successfully.');
             }
 
-            header('Location: receipt_print.php?id=' . $ledgerId);
+            $profileUrl = 'person_profile.php?id=' . $selectedDonorId;
+            $receiptUrl = 'receipt_print.php?id=' . $ledgerId . '&return=' . urlencode($profileUrl);
+            header('Location: ' . $receiptUrl);
             exit;
 
         } catch (Throwable $e) {
@@ -496,7 +369,7 @@ $autoJumpToCategory = $selectedDonorId > 0 && $selectedDonor && $_SERVER['REQUES
 
 require_once __DIR__ . '/includes/header.php';
 ?>
-<h1 class="title">Collect Donation / Loan</h1>
+<h1 class="title">Collect Donation</h1>
 
 <div class="card collect-card-v5 stack">
     <?php if ($success): ?>
@@ -582,8 +455,7 @@ require_once __DIR__ . '/includes/header.php';
                 <?php foreach ([
                     'one_time' => ['🎁', 'One Time'],
                     'monthly'  => ['🗓️', 'Monthly'],
-                    'event'    => ['🎉', 'Event'],
-                    'loan'     => ['🤝', 'Loan']
+                    'event'    => ['🎉', 'Event']
                 ] as $value => [$icon, $label]): ?>
                     <label class="collect-card-option-v5">
                         <input type="radio" name="category" value="<?= e($value) ?>" <?= (string)tx_old('category', '') === $value ? 'checked' : '' ?>>
@@ -607,44 +479,6 @@ require_once __DIR__ . '/includes/header.php';
                 </select>
             </div>
 
-            <div id="loan_fields" class="stack compact collect-conditional-v5<?= (string)tx_old('category', '') === 'loan' ? '' : ' hidden' ?>">
-                <div class="section-title">Loan Type</div>
-                <div class="collect-loan-type-grid-v5">
-                    <?php foreach ([
-                        'Provide' => ['⬅️', 'Provide', 'Mosque gives money out'],
-                        'Receive' => ['➡️', 'Receive', 'Mosque receives loan']
-                    ] as $value => [$icon, $label, $desc]): ?>
-                        <label class="collect-card-option-v5">
-                            <input type="radio" name="loan_type" value="<?= e($value) ?>" <?= (string)tx_old('loan_type', '') === $value ? 'checked' : '' ?>>
-                            <span class="collect-card-pill-v5 collect-loan-pill-v5">
-                                <span class="icon"><?= $icon ?></span>
-                                <span><?= e($label) ?></span>
-                                <small><?= e($desc) ?></small>
-                            </span>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
-
-                <div class="collect-loan-grid-v5">
-                    <div>
-                        <label>Loan Title / Purpose</label>
-                        <input
-                            type="text"
-                            name="loan_title"
-                            value="<?= e((string)tx_old('loan_title', '')) ?>"
-                            placeholder="e.g. Mosque renovation support"
-                        >
-                    </div>
-                    <div>
-                        <label>Expected Return Date</label>
-                        <input
-                            type="date"
-                            name="loan_return_date"
-                            value="<?= e((string)tx_old('loan_return_date', '')) ?>"
-                        >
-                    </div>
-                </div>
-            </div>
 
             <div class="section-title">Amount</div>
             <div class="stack compact">
@@ -715,7 +549,7 @@ require_once __DIR__ . '/includes/header.php';
 
             <div class="toolbar collect-toolbar-v5">
                 <button type="submit" class="btn btn-primary">
-                    <?= (string)tx_old('category', '') === 'loan' ? 'Save Loan' : 'Save Donation' ?>
+                    Save Donation
                 </button>
             </div>
         </div>
@@ -789,10 +623,8 @@ require_once __DIR__ . '/includes/header.php';
         const val = selected ? selected.value : '';
 
         document.getElementById('event_fields').classList.toggle('hidden', val !== 'event');
-        document.getElementById('loan_fields').classList.toggle('hidden', val !== 'loan');
-
         if (saveButton) {
-            saveButton.textContent = val === 'loan' ? 'Save Loan' : 'Save Donation';
+            saveButton.textContent = 'Save Donation';
         }
     }
 

@@ -2,7 +2,7 @@
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
-requireRole($pdo, 'operator');
+//requireRole($pdo, 'operator','accountant');
 
 $id = max(0, (int)($_GET['id'] ?? 0));
 if ($id <= 0) {
@@ -36,6 +36,7 @@ $totalIn = 0;
 $totalOut = 0;
 $selfDonationTotal = 0;
 $collectedDonationTotal = 0;
+$localDonationValueTotal = 0;
 
 $hasSourceColumns = function_exists('columnExists')
     && tableExists($pdo, 'operator_ledger')
@@ -125,6 +126,18 @@ if (tableExists($pdo, 'operator_ledger')) {
 
 foreach ($transactions as $t) {
     $amountValue = (float)$t['amount'];
+    $categoryValue = strtolower(trim((string)($t['cat'] ?? '')));
+    $notesValue = strtolower((string)($t['notes'] ?? ''));
+
+    $isInformationalDonation = (
+        $categoryValue === 'donation_value'
+        || str_contains($notesValue, 'informational donation only')
+    );
+
+    if ($isInformationalDonation) {
+        $localDonationValueTotal += abs($amountValue);
+        continue;
+    }
 
     if ($amountValue >= 0) {
         $totalIn += $amountValue;
@@ -163,6 +176,7 @@ function profileMethodLabel(string $method): string {
     };
 }
 
+$pageClass = 'page-person-profile';
 require_once __DIR__ . '/includes/header.php';
 ?>
 
@@ -189,7 +203,8 @@ require_once __DIR__ . '/includes/header.php';
 
             <div class="person-actions-v5">
                 <a class="btn btn-primary" href="transaction_page.php?person_id=<?= (int)$person['ID'] ?>#category_start_v5">Collect Donation</a>
-                <a class="btn" href="expense_page.php?person_id=<?= (int)$person['ID'] ?>">Add Expense</a>
+                <a class="btn" href="add_expense.php?person_id=<?= (int)$person['ID'] ?>">Add Expense</a>
+                <a class="btn" href="add_donation.php?person_id=<?= (int)$person['ID'] ?>">Add Donation</a>
                 <a class="btn" href="public_donor_report.php?id=<?= (int)$person['ID'] ?>">Open Public Report</a>
             </div>
         </div>
@@ -208,8 +223,12 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="summary"><?= money($collectedDonationTotal) ?></div>
             </div>
             <div class="card person-summary-card-v5">
-                <div class="muted">Total Expenses</div>
+                <div class="muted">Total Expense</div>
                 <div class="summary"><?= money($totalOut) ?></div>
+            </div>
+            <div class="card person-summary-card-v5">
+                <div class="muted">Local Cards / Donation Value</div>
+                <div class="summary"><?= money($localDonationValueTotal) ?></div>
             </div>
             <div class="card person-summary-card-v5">
                 <div class="muted">Net</div>

@@ -101,21 +101,10 @@ body.page-transaction-page .section-title{
 
 body.page-transaction-page .collect-category-grid-v5{
     display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
     gap:12px;
 }
 
-body.page-transaction-page .collect-loan-type-grid-v5{
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:12px;
-}
-
-body.page-transaction-page .collect-loan-grid-v5{
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:12px;
-}
 
 body.page-transaction-page .collect-payment-row-v5{
     display:grid;
@@ -150,21 +139,6 @@ body.page-transaction-page .collect-card-pill-v5{
     cursor:pointer;
 }
 
-body.page-transaction-page .collect-loan-pill-v5{
-    min-height:112px;
-}
-
-body.page-transaction-page .collect-loan-pill-v5 small{
-    display:block;
-    font-size:12px;
-    font-weight:600;
-    color:#64748b;
-    line-height:1.35;
-}
-
-body.page-transaction-page .collect-card-option-v5 input:checked + .collect-card-pill-v5 .collect-loan-pill-v5 small{
-    color:#fff;
-}
 
 body.page-transaction-page .collect-payment-option-v5 .collect-card-pill-v5{
     min-height:82px;
@@ -213,8 +187,7 @@ body.page-transaction-page .collect-date-notes-grid-v5{
     gap:12px;
 }
 
-body.page-transaction-page .collect-date-notes-grid-v5 > div,
-body.page-transaction-page .collect-loan-grid-v5 > div{
+body.page-transaction-page .collect-date-notes-grid-v5 > div{
     min-width:0;
 }
 
@@ -272,13 +245,16 @@ body.page-transaction-page .collect-toolbar-v5{
         padding:10px 4px;
     }
 
-    body.page-transaction-page .collect-date-notes-grid-v5,
-    body.page-transaction-page .collect-loan-grid-v5,
-    body.page-transaction-page .collect-loan-type-grid-v5{
+    body.page-transaction-page .collect-category-grid-v5,
+    body.page-transaction-page .collect-date-notes-grid-v5{
         grid-template-columns:1fr;
     }
 }
 
 body.page-transaction-page .collect-card-option-v5 input:checked + .collect-card-pill-v5 small{
     color:#fff;
+}
+
+body.page-transaction-page .collect-category-grid-v5 .collect-card-pill-v5{
+    min-height:112px;
 }

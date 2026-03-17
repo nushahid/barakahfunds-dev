@@ -58,7 +58,6 @@ function receiptDonationType(PDO $pdo, array $row): string
 {
     $category = (string)($row['transaction_category'] ?? 'one_time');
     if ($category === 'monthly') return 'Monthly';
-    if ($category === 'loan') return 'Loan';
     if ($category === 'event') {
         $eventName = receiptEventName($pdo, $row);
         return $eventName !== '' ? $eventName : 'Event';
@@ -74,7 +73,6 @@ function receiptDescription(PDO $pdo, array $row): string
         return $eventName !== '' ? $eventName : 'Event Donation';
     }
     if ($category === 'monthly') return 'Monthly Donation';
-    if ($category === 'loan') return 'Loan Donation';
     return 'One Time Donation';
 }
 
@@ -183,6 +181,10 @@ $donationType = receiptDonationType($pdo, $row);
 $descriptionText = receiptDescription($pdo, $row);
 $advanceText = receiptMonthlyAdvanceText($pdo, $row);
 $sourceInfo = receiptSourceInfo($row);
+$returnUrl = trim((string)($_GET['return'] ?? ''));
+if ($returnUrl === '' || preg_match('/^(https?:)?\/\//i', $returnUrl)) {
+    $returnUrl = 'person_profile.php?id=' . $personId;
+}
 ?><!doctype html>
 <html>
 <head>
@@ -191,8 +193,11 @@ $sourceInfo = receiptSourceInfo($row);
 <title>Receipt <?= e($invoice) ?></title>
 <style>
     body { font-family: Arial, Helvetica, sans-serif; background:#eef2f7; margin:0; color:#0f172a; }
-    .toolbar { max-width: 920px; margin: 18px auto 0; display:flex; justify-content:flex-end; }
-    .toolbar button { border:0; background:#0f172a; color:#fff; padding:10px 16px; border-radius:10px; font-size:14px; cursor:pointer; }
+    .toolbar { max-width: 920px; margin: 18px auto 0; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .toolbar-left { display:flex; gap:10px; flex-wrap:wrap; }
+    .toolbar-note { font-size:13px; color:#475569; }
+    .toolbar a, .toolbar button { border:0; background:#0f172a; color:#fff; padding:10px 16px; border-radius:10px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .toolbar a.secondary { background:#475569; }
     .page { max-width: 920px; margin: 14px auto 28px; background:#fff; box-shadow:0 12px 32px rgba(15,23,42,.10); border-radius:16px; overflow:hidden; }
     .inner { padding: 26px 30px 30px; }
     .header { display:flex; gap:18px; align-items:flex-start; border-bottom:2px solid #dbe4f0; padding-bottom:18px; }
@@ -228,6 +233,9 @@ $sourceInfo = receiptSourceInfo($row);
         .page { box-shadow:none; margin:0; max-width:none; border-radius:0; }
     }
     @media (max-width: 700px) {
+        .toolbar { align-items:stretch; }
+        .toolbar-left { width:100%; }
+        .toolbar a, .toolbar button { flex:1 1 auto; }
         .header, .info-grid, .footer, .titlebar { display:block; }
         .logo-wrap { margin-bottom:12px; }
         .titlebar .no { margin-top:6px; }
@@ -237,7 +245,13 @@ $sourceInfo = receiptSourceInfo($row);
 </style>
 </head>
 <body>
-<div class="toolbar"><button onclick="window.print()">Print Receipt</button></div>
+<div class="toolbar">
+    <div class="toolbar-left">
+        <button type="button" onclick="window.print()">Print Receipt</button>
+        <a href="<?= e($returnUrl) ?>" class="secondary">Back to Donor Profile</a>
+    </div>
+    <div class="toolbar-note">On mobile you can use Print or Save as PDF from your browser.</div>
+</div>
 <div class="page">
     <div class="inner">
         <div class="header">
@@ -317,5 +331,17 @@ $sourceInfo = receiptSourceInfo($row);
         </div>
     </div>
 </div>
+<script>
+(function () {
+    var isProbablyMobile = window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
+    if (!isProbablyMobile) {
+        window.addEventListener('load', function () {
+            window.setTimeout(function () {
+                try { window.print(); } catch (e) {}
+            }, 350);
+        }, { once: true });
+    }
+})();
+</script>
 </body>
 </html>
