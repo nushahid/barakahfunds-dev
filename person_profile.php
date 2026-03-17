@@ -552,12 +552,12 @@ require_once __DIR__ . '/includes/header.php';
                                     <a class="btn btn-primary" href="<?= e($collectUrl) ?>">Collect Now</a>
                                     <a class="btn" href="<?= e($editUrl) ?>">Edit</a>
 
-                                    <form method="post" style="display:inline;">
+                                    <!-- <form method="post" style="display:inline;">
                                         <?= csrfField() ?>
                                         <input type="hidden" name="commitment_action" value="mark_paid">
                                         <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
                                         <button type="submit" class="btn">Mark Paid</button>
-                                    </form>
+                                    </form> -->
 
                                     <form method="post" style="display:inline;" onsubmit="return confirm('Cancel this expected record?');">
                                         <?= csrfField() ?>

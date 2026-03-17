@@ -840,7 +840,14 @@ require_once __DIR__ . '/includes/header.php';
                     'event'    => ['🎉', 'Event']
                 ] as $value => [$icon, $label]): ?>
                     <label class="collect-card-option-v5">
-                        <input type="radio" name="category" value="<?= e($value) ?>" <?= (string)tx_old('category', '') === $value ? 'checked' : '' ?>>
+                
+                    <input type="radio" name="category" value="<?= e($value) ?>"
+    <?= (
+        (string)tx_old('category', '') === $value
+        || (tx_old('category', '') === '' && $value === 'one_time')
+    ) ? 'checked' : '' ?>
+>
+
                         <span class="collect-card-pill-v5">
                             <span class="icon"><?= $icon ?></span>
                             <span><?= e($label) ?></span>

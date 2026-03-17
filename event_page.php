@@ -3,22 +3,55 @@ require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
 
-requireRole($pdo, ['accountant','admin']);
+requireRole($pdo, ['accountant', 'admin']);
 
 $uid = getLoggedInUserId();
 $errors = [];
 $statusCol = columnExists($pdo, 'events', 'status');
 $editId = (int)($_GET['edit'] ?? 0);
 
+$formData = [
+    'name' => '',
+    'estimate' => '',
+    'description' => '',
+    'status' => 1,
+];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfOrFail();
 
     $action = (string)($_POST['action'] ?? 'create');
     $eventId = (int)($_POST['event_id'] ?? 0);
-    $name = trim((string)($_POST['name'] ?? ''));
-    $estimated = (float)($_POST['estimate'] ?? 0);
-    $notes = trim((string)($_POST['description'] ?? ''));
-    $status = (int)($_POST['status'] ?? 1) === 1 ? 1 : 0;
+
+    if ($action === 'toggle' && $statusCol && $eventId > 0) {
+        $newStatus = (int)($_POST['new_status'] ?? 1) === 1 ? 1 : 0;
+
+        $pdo->prepare('UPDATE events SET status = ? WHERE ID = ?')
+            ->execute([$newStatus, $eventId]);
+
+        systemLog($pdo, $uid, 'event', 'toggle', 'Event status ' . $newStatus, $eventId);
+        setFlash('success', 'Event status updated.');
+
+        $redirect = 'event_page.php';
+        if ((int)($_POST['return_edit'] ?? 0) > 0) {
+            $redirect .= '?edit=' . $eventId;
+        }
+
+        header('Location: ' . $redirect);
+        exit;
+    }
+
+  $name = trim((string)($_POST['name'] ?? ''));
+$estimated = (float)($_POST['estimate'] ?? 0);
+$notes = trim((string)($_POST['description'] ?? ''));
+$status = (int)($_POST['status'] ?? 0) === 1 ? 1 : 0;
+
+$formData = [
+    'name' => $name,
+    'estimate' => (string)($_POST['estimate'] ?? ''),
+    'description' => $notes,
+    'status' => $status,
+];
 
     if ($name === '') {
         $errors[] = 'Event name is required.';
@@ -36,14 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             systemLog($pdo, $uid, 'event', 'update', $name, $eventId);
             setFlash('success', 'Event updated.');
-        } elseif ($action === 'toggle' && $statusCol && $eventId > 0) {
-            $newStatus = (int)($_POST['new_status'] ?? 1) === 1 ? 1 : 0;
-
-            $pdo->prepare('UPDATE events SET status = ? WHERE ID = ?')
-                ->execute([$newStatus, $eventId]);
-
-            systemLog($pdo, $uid, 'event', 'toggle', 'Event status ' . $newStatus, $eventId);
-            setFlash('success', 'Event status updated.');
         } else {
             if ($statusCol) {
                 $pdo->prepare('INSERT INTO events (name, estimated, notes, status, uid, created_at) VALUES (?, ?, ?, ?, ?, NOW())')
@@ -83,128 +108,150 @@ foreach ($events as $event) {
     }
 }
 
+if ($editRow && !$errors) {
+    $formData = [
+        'name' => (string)($editRow['name'] ?? ''),
+        'estimate' => (string)($editRow['estimated'] ?? ''),
+        'description' => (string)($editRow['notes'] ?? ''),
+        'status' => (int)($editRow['status'] ?? 1),
+    ];
+}
+
 require_once __DIR__ . '/includes/header.php';
 ?>
 
 <h1 class="title">Events</h1>
 
-<div class="grid-2 event-page-layout">
-    <div class="card stack event-form-card">
-        <?php if ($errors): ?>
-            <div class="alert error">
-                <?php foreach ($errors as $er): ?>
-                    <div><?= e($er) ?></div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+<?php if ($errors): ?>
+  <div class="alert error">
+    <?php foreach ($errors as $er): ?>
+      <div><?= e($er) ?></div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
 
-        <div class="toolbar">
-            <h2 class="event-page-subtitle"><?= $editRow ? 'Edit Event' : 'New Event' ?></h2>
-            <?php if ($editRow): ?>
-                <a class="btn" href="event_page.php">Cancel</a>
-            <?php endif; ?>
+<div class="event-page-wrap">
+  <section class="card stack event-form-card">
+    <div class="toolbar event-card-head">
+      <div>
+        <h2 class="event-subtitle"><?= $editRow ? 'Edit Event' : 'New Event' ?></h2>
+        <p class="muted event-helper">Create a new event or update an existing one.</p>
+      </div>
+      <?php if ($editRow): ?>
+        <a class="btn" href="event_page.php">Cancel</a>
+      <?php endif; ?>
+    </div>
+
+    <form method="post" class="stack event-form-grid">
+      <?= csrfField() ?>
+      <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
+
+      <?php if ($editRow): ?>
+        <input type="hidden" name="event_id" value="<?= (int)$editRow['ID'] ?>">
+      <?php endif; ?>
+
+      <div>
+        <label for="event-name">Event Name</label>
+        <input id="event-name" type="text" name="name" value="<?= e($formData['name']) ?>" required>
+      </div>
+
+      <div>
+        <label for="event-estimate">Target Amount</label>
+        <input id="event-estimate" type="number" step="0.01" name="estimate" value="<?= e($formData['estimate']) ?>">
+      </div>
+
+      <div>
+        <label for="event-description">Description</label>
+        <textarea id="event-description" name="description" rows="5"><?= e($formData['description']) ?></textarea>
+      </div>
+
+      <?php if ($statusCol): ?>
+    <div>
+        <label>Status</label>
+        <div class="event-status-inline">
+            <label class="event-switch" aria-label="Event status toggle">
+                <input type="hidden" name="status" value="0">
+                <input type="checkbox" name="status" value="1" <?= (int)$formData['status'] === 1 ? 'checked' : '' ?>>
+                <span class="event-switch-slider"></span>
+            </label>
+            <span class="event-switch-text <?= (int)$formData['status'] === 1 ? 'is-active' : 'is-inactive' ?>">
+                <?= (int)$formData['status'] === 1 ? 'Active' : 'Inactive' ?>
+            </span>
         </div>
+        <div class="muted small">Turn off to keep the event in history without using it actively.</div>
+    </div>
+<?php endif; ?>
 
-        <form method="post" class="stack">
-            <?= csrfField() ?>
-            <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
+      <button class="btn btn-primary event-submit" type="submit">
+        <?= $editRow ? 'Update Event' : 'Save Event' ?>
+      </button>
+    </form>
+  </section>
 
-            <?php if ($editRow): ?>
-                <input type="hidden" name="event_id" value="<?= (int)$editRow['ID'] ?>">
-            <?php endif; ?>
+  <section class="card stack event-list-card">
+    <div class="toolbar event-card-head">
+      <div>
+        <h2 class="event-subtitle">Event List</h2>
+        <p class="muted event-helper">Tap any event to load it into the form for editing.</p>
+      </div>
+      <span class="tag orange"><?= count($events) ?> total</span>
+    </div>
 
-            <div>
-                <label>Event Name</label>
-                <input type="text" name="name" value="<?= e((string)($editRow['name'] ?? '')) ?>" required>
+    <div class="search-results event-results">
+      <?php foreach ($events as $event): ?>
+        <?php $isEditing = (int)$event['ID'] === $editId; ?>
+        <div class="search-row event-row <?= $isEditing ? 'is-selected' : '' ?>">
+          <a class="event-row-link" href="event_page.php?edit=<?= (int)$event['ID'] ?>">
+            <div class="event-row-main">
+              <div class="event-row-top">
+                <strong><?= e((string)$event['name']) ?></strong>
+                <?php if ($statusCol): ?>
+                  <span class="tag <?= (int)$event['status'] === 1 ? 'green' : 'red' ?>">
+                    <?= (int)$event['status'] === 1 ? 'Active' : 'Inactive' ?>
+                  </span>
+                <?php endif; ?>
+              </div>
+
+              <?php if (trim((string)($event['notes'] ?? '')) !== ''): ?>
+                <span class="muted event-row-desc"><?= e((string)$event['notes']) ?></span>
+              <?php else: ?>
+                <span class="muted event-row-desc">No description added.</span>
+              <?php endif; ?>
+
+              <div class="event-row-stats">
+                <span class="tag blue">Target <?= money((float)($event['estimated'] ?? 0)) ?></span>
+                <span class="tag orange">Collected <?= money((float)($event['collected'] ?? 0)) ?></span>
+              </div>
             </div>
+          </a>
 
-            <div>
-                <label>Target Amount</label>
-                <input type="number" step="0.01" name="estimate" value="<?= e((string)($editRow['estimated'] ?? '')) ?>">
-            </div>
-
-            <div>
-                <label>Description</label>
-                <textarea name="description"><?= e((string)($editRow['notes'] ?? '')) ?></textarea>
-            </div>
+          <div class="compact-actions event-row-actions">
+            <a class="btn <?= $isEditing ? 'btn-primary' : '' ?>" href="event_page.php?edit=<?= (int)$event['ID'] ?>">
+              <?= $isEditing ? 'Editing' : 'Edit' ?>
+            </a>
 
             <?php if ($statusCol): ?>
-                <div>
-                    <label>Status</label>
-                    <div class="payment-chip-group event-status-group">
-                        <?php foreach ([[1,'🟢','Active'], [0,'⚪','Inactive']] as $s): ?>
-                            <label class="selector-label">
-                                <input
-                                    class="selector-input"
-                                    type="radio"
-                                    name="status"
-                                    value="<?= (int)$s[0] ?>"
-                                    <?= (int)($editRow['status'] ?? 1) === (int)$s[0] ? 'checked' : '' ?>
-                                >
-                                <span class="payment-chip">
-                                    <span><?= e($s[1]) ?></span>
-                                    <span><?= e($s[2]) ?></span>
-                                </span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+              <form method="post" class="event-toggle-form">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="toggle">
+                <input type="hidden" name="event_id" value="<?= (int)$event['ID'] ?>">
+                <input type="hidden" name="new_status" value="<?= (int)$event['status'] === 1 ? 0 : 1 ?>">
+                <input type="hidden" name="return_edit" value="<?= $isEditing ? 1 : 0 ?>">
+                <label class="event-switch compact" aria-label="Toggle event status">
+                  <input type="checkbox" <?= (int)$event['status'] === 1 ? 'checked' : '' ?> onchange="this.form.submit()">
+                  <span class="event-switch-slider"></span>
+                </label>
+              </form>
             <?php endif; ?>
-
-            <button class="btn btn-primary" type="submit">
-                <?= $editRow ? 'Update Event' : 'Save Event' ?>
-            </button>
-        </form>
-    </div>
-
-    <div class="card event-list-card">
-        <div class="toolbar">
-            <h2 class="event-page-subtitle">Event List</h2>
-            <span class="tag blue"><?= count($events) ?> total</span>
+          </div>
         </div>
+      <?php endforeach; ?>
 
-        <div class="search-results event-results">
-            <?php foreach ($events as $event): ?>
-                <a class="search-row event-search-row" href="event_page.php?edit=<?= (int)$event['ID'] ?>">
-                    <div class="event-row-main">
-                        <strong><?= e((string)$event['name']) ?></strong>
-                        <div class="muted"><?= e((string)($event['notes'] ?? '')) ?></div>
-
-                        <div class="event-row-stats">
-                            <span class="tag blue">Target <?= money((float)($event['estimated'] ?? 0)) ?></span>
-                            <span class="tag orange">Collected <?= money((float)($event['collected'] ?? 0)) ?></span>
-                        </div>
-                    </div>
-
-                    <div class="compact-actions event-row-actions">
-                        <?php if ($statusCol): ?>
-                            <span class="tag <?= (int)$event['status'] === 1 ? 'green' : 'red' ?>">
-                                <?= (int)$event['status'] === 1 ? 'Active' : 'Inactive' ?>
-                            </span>
-                        <?php endif; ?>
-
-                        <span class="btn">Edit</span>
-
-                        <?php if ($statusCol): ?>
-                            <form method="post" class="event-toggle-form" onclick="event.stopPropagation();">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="action" value="toggle">
-                                <input type="hidden" name="event_id" value="<?= (int)$event['ID'] ?>">
-                                <input type="hidden" name="new_status" value="<?= (int)$event['status'] === 1 ? 0 : 1 ?>">
-                                <button class="btn" type="submit">
-                                    <?= (int)$event['status'] === 1 ? 'Set Inactive' : 'Set Active' ?>
-                                </button>
-                            </form>
-                        <?php endif; ?>
-                    </div>
-                </a>
-            <?php endforeach; ?>
-
-            <?php if (!$events): ?>
-                <div class="muted">No events found.</div>
-            <?php endif; ?>
-        </div>
+      <?php if (!$events): ?>
+        <div class="event-empty muted">No events yet.</div>
+      <?php endif; ?>
     </div>
+  </section>
 </div>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

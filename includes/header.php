@@ -9,29 +9,71 @@ $appTitle = isset($pdo) ? appName($pdo) : 'BarakahFunds v4';
 $lang = isset($pdo) ? currentLanguage($pdo) : 'en';
 $logoPath = (isset($pdo) && function_exists('receiptLogoPath')) ? receiptLogoPath($pdo) : '';
 $menu = [
+
+    // 🏠 Core
     ['file' => 'index.php', 'label' => 'Dashboard', 'icon' => '🏠', 'roles' => ['operator','accountant','admin']],
+
+    // 👥 Donor Management
     ['file' => 'donors.php', 'label' => 'Donors', 'icon' => '👥', 'roles' => ['operator']],
-    ['file' => 'transaction_page.php', 'label' => 'Collect Donation', 'icon' => '💝', 'roles' => ['operator','accountant']],
-    ['file' => 'transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['operator']],
-    ['file' => 'all_transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['accountant']],
-    ['file' => 'add_expense.php', 'label' => 'Add Expense', 'icon' => '💸', 'roles' => ['operator']],
-    ['file' => 'anonymous_collections.php', 'label' => 'Anonymous Collections', 'icon' => '📦', 'roles' => ['operator','accountant']],
+
+    // 💰 Fund Collection
+    ['file' => 'transaction_page.php', 'label' => 'Donations', 'icon' => '💝', 'roles' => ['operator','accountant']],
+    ['file' => 'anonymous_collections.php', 'label' => 'Anonymous Donations', 'icon' => '📦', 'roles' => ['operator','accountant']],
     ['file' => 'donation_boxes.php', 'label' => 'Donation Boxes', 'icon' => '🗃️', 'roles' => ['operator','accountant','admin']],
-    ['file' => 'transfer_requests.php', 'label' => 'Transfers', 'icon' => '🔄', 'roles' => ['operator','accountant']],
-    ['file' => 'accounts_report.php', 'label' => 'Reports', 'icon' => '📊', 'roles' => ['accountant','admin']],
-    ['file' => 'stripe_reconciliation.php', 'label' => 'Stripe Reconciliation', 'icon' => '🧾', 'roles' => ['accountant']],
-    ['file' => 'payment_adjustments.php', 'label' => 'Payment Adjustments', 'icon' => '🛠️', 'roles' => ['accountant']],
-    ['file' => 'event_page.php', 'label' => 'Events', 'icon' => '🎉', 'roles' => ['accountant','admin']],
-    ['file' => 'loan_page.php', 'label' => 'Loan Management', 'icon' => '🤝', 'roles' => ['accountant','admin']],
-    ['file' => 'transaction_delete_requests.php', 'label' => 'Delete Requests', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
-    ['file' => 'deleted_transactions.php', 'label' => 'Deleted Transactions', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
+
+    // 📊 Financial Tracking
+    ['file' => 'transactions.php', 'label' => 'My Transactions', 'icon' => '🧾', 'roles' => ['operator']],
+    ['file' => 'all_transactions.php', 'label' => 'All Transactions', 'icon' => '📑', 'roles' => ['accountant']],
+    ['file' => 'add_expense.php', 'label' => 'Expenses', 'icon' => '💸', 'roles' => ['operator']],
     ['file' => 'expense_categories.php', 'label' => 'Expense Categories', 'icon' => '🗂️', 'roles' => ['accountant','admin']],
+
+    // 🔄 Fund Movement
+    ['file' => 'transfer_requests.php', 'label' => 'Transfers', 'icon' => '🔄', 'roles' => ['operator','accountant']],
+
+    // 📈 Reports & Reconciliation
+    ['file' => 'accounts_report.php', 'label' => 'Reports', 'icon' => '📊', 'roles' => ['accountant','admin']],
+    ['file' => 'stripe_reconciliation.php', 'label' => 'Stripe Reconciliation', 'icon' => '💳', 'roles' => ['accountant']],
+    ['file' => 'payment_adjustments.php', 'label' => 'Adjustments', 'icon' => '🛠️', 'roles' => ['accountant']],
+
+    // 🎉 Operations
+    ['file' => 'event_page.php', 'label' => 'Events', 'icon' => '🎉', 'roles' => ['accountant','admin']],
+    ['file' => 'loan_page.php', 'label' => 'Loans', 'icon' => '🤝', 'roles' => ['accountant','admin']],
     ['file' => 'death_societies.php', 'label' => 'Death Societies', 'icon' => '🕊️', 'roles' => ['accountant','admin']],
-    ['file' => 'mosque_settings.php', 'label' => 'Mosque Settings', 'icon' => '🕌', 'roles' => ['admin']],
+
+    // 🛡️ Admin Controls
+    ['file' => 'transaction_delete_requests.php', 'label' => 'Delete Requests', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
+    ['file' => 'deleted_transactions.php', 'label' => 'Deleted Records', 'icon' => '♻️', 'roles' => ['accountant','admin']],
     ['file' => 'admin_users.php', 'label' => 'Users', 'icon' => '👤', 'roles' => ['admin']],
+    ['file' => 'mosque_settings.php', 'label' => 'Settings', 'icon' => '🕌', 'roles' => ['admin']],
     ['file' => 'system_logs.php', 'label' => 'System Logs', 'icon' => '📜', 'roles' => ['admin']],
+
+    // 👤 User
     ['file' => 'my_profile.php', 'label' => 'My Profile', 'icon' => '🙍', 'roles' => ['operator','accountant','admin']],
 ];
+// $menu = [
+//     ['file' => 'index.php', 'label' => 'Dashboard', 'icon' => '🏠', 'roles' => ['operator','accountant','admin']],
+//     ['file' => 'donors.php', 'label' => 'Donors', 'icon' => '👥', 'roles' => ['operator']],
+//     ['file' => 'transaction_page.php', 'label' => 'Collect Donation', 'icon' => '💝', 'roles' => ['operator','accountant']],
+//     ['file' => 'transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['operator']],
+//     ['file' => 'all_transactions.php', 'label' => 'Transactions', 'icon' => '🧾', 'roles' => ['accountant']],
+//     ['file' => 'add_expense.php', 'label' => 'Add Expense', 'icon' => '💸', 'roles' => ['operator']],
+//     ['file' => 'anonymous_collections.php', 'label' => 'Anonymous Collections', 'icon' => '📦', 'roles' => ['operator','accountant']],
+//     ['file' => 'donation_boxes.php', 'label' => 'Donation Boxes', 'icon' => '🗃️', 'roles' => ['operator','accountant','admin']],
+//     ['file' => 'transfer_requests.php', 'label' => 'Transfers', 'icon' => '🔄', 'roles' => ['operator','accountant']],
+//     ['file' => 'accounts_report.php', 'label' => 'Reports', 'icon' => '📊', 'roles' => ['accountant','admin']],
+//     ['file' => 'stripe_reconciliation.php', 'label' => 'Stripe Reconciliation', 'icon' => '🧾', 'roles' => ['accountant']],
+//     ['file' => 'payment_adjustments.php', 'label' => 'Payment Adjustments', 'icon' => '🛠️', 'roles' => ['accountant']],
+//     ['file' => 'event_page.php', 'label' => 'Events Management', 'icon' => '🎉', 'roles' => ['accountant','admin']],
+//     ['file' => 'loan_page.php', 'label' => 'Loan Management', 'icon' => '🤝', 'roles' => ['accountant','admin']],
+//     ['file' => 'transaction_delete_requests.php', 'label' => 'Delete Requests', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
+//     ['file' => 'deleted_transactions.php', 'label' => 'Deleted Transactions', 'icon' => '🗑️', 'roles' => ['accountant','admin']],
+//     ['file' => 'expense_categories.php', 'label' => 'Expense Categories', 'icon' => '🗂️', 'roles' => ['accountant','admin']],
+//     ['file' => 'death_societies.php', 'label' => 'Death Societies', 'icon' => '🕊️', 'roles' => ['accountant','admin']],
+//     ['file' => 'mosque_settings.php', 'label' => 'Mosque Settings', 'icon' => '🕌', 'roles' => ['admin']],
+//     ['file' => 'admin_users.php', 'label' => 'Users', 'icon' => '👤', 'roles' => ['admin']],
+//     ['file' => 'system_logs.php', 'label' => 'System Logs', 'icon' => '📜', 'roles' => ['admin']],
+//     ['file' => 'my_profile.php', 'label' => 'My Profile', 'icon' => '🙍', 'roles' => ['operator','accountant','admin']],
+// ];
 $pageName = strtolower(pathinfo($current, PATHINFO_FILENAME));
 $pageClass = preg_replace('/[^a-z0-9]+/i', '-', $pageName);
 $pageCssFile = __DIR__ . '/../assets/pages/' . $pageName . '.css';

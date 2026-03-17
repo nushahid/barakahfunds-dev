@@ -192,11 +192,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === '
 
     $uploadedReceiptPath = null;
     if (function_exists('columnExists') && columnExists($pdo, 'expense', 'media')) {
-        $receiptUpload = handleExpenseReceiptUpload($_FILES['expense_receipt'] ?? []);
-        if (!empty($receiptUpload['error'])) {
-            $errors[] = (string)$receiptUpload['error'];
+        $receiptFile = $_FILES['expense_receipt'] ?? [];
+        $receiptRequired = $amount >= 50;
+
+        if ($receiptRequired && (($receiptFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE)) {
+            $errors[] = 'Receipt upload is required for expenses of 50 EUR or more.';
         } else {
-            $uploadedReceiptPath = $receiptUpload['path'] ?? null;
+            $receiptUpload = handleExpenseReceiptUpload($receiptFile);
+            if (!empty($receiptUpload['error'])) {
+                $errors[] = (string)$receiptUpload['error'];
+            } else {
+                $uploadedReceiptPath = $receiptUpload['path'] ?? null;
+            }
         }
     }
 
@@ -452,6 +459,12 @@ body.page-add-expense .add-expense-static-value-v2{
     font-weight:700;
     line-height:1.35;
 }
+body.page-add-expense .add-expense-upload-help-v2{
+    margin-top:8px;
+    font-size:12px;
+    color:#6b7280;
+    line-height:1.5;
+}
 @media (max-width: 1100px){
     body.page-add-expense .payment-methods-grid-v2{
         grid-template-columns:repeat(5, minmax(72px, 1fr));
@@ -603,10 +616,10 @@ body.page-add-expense .add-expense-static-value-v2{
         </div>
 
         <div class="add-expense-field-full-v2 add-expense-upload-field-v2">
-            <label for="expense_receipt_v2">Receipt Upload</label>
+            <label for="expense_receipt_v2">Receipt Upload (required from 50 EUR)</label>
             <input type="file" name="expense_receipt" id="expense_receipt_v2" accept="image/*,application/pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" capture="environment">
             <div class="add-expense-upload-help-v2">
-                Upload receipt in PDF or image format. On phone, this can open the back camera to take photo of the slip.
+                Receipt is optional for expenses below 50 EUR. For 50 EUR or more, receipt upload is mandatory. On phone, this can open the back camera to take photo of the slip.
             </div>
         </div>
 
