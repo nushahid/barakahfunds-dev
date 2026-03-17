@@ -371,255 +371,327 @@ require_once __DIR__ . '/includes/header.php';
 <h1 class="title">Donor Profile &amp; Activity Ledger</h1>
 
 <div class="person-profile-v5">
-    <div class="person-profile-main-v5">
-        <div class="card person-hero-card-v5">
-            <div class="toolbar person-hero-top-v5">
-                <div>
-                    <h2 class="person-name-v5"><?= e((string)$person['name']) ?></h2>
-                    <div class="muted">
-                        <?= e((string)$person['phone']) ?><?= !empty($person['city']) ? ' · ' . e((string)$person['city']) : '' ?>
+    <div class="person-profile-top-v5">
+        <div class="person-profile-main-v5">
+            <div class="card person-hero-card-v5">
+                <div class="toolbar person-hero-top-v5">
+                    <div>
+                        <h2 class="person-name-v5"><?= e((string)$person['name']) ?></h2>
+                        <div class="muted">
+                            <?= e((string)$person['phone']) ?><?= !empty($person['city']) ? ' · ' . e((string)$person['city']) : '' ?>
+                        </div>
                     </div>
+                    <a class="btn" href="add_person.php?id=<?= (int)$person['ID'] ?>">Edit Donor</a>
                 </div>
-                <a class="btn" href="add_person.php?id=<?= (int)$person['ID'] ?>">Edit Donor</a>
+
+                <div class="badge-list person-badges-v5">
+                    <?php if ((int)$person['life_membership'] === 1): ?><span class="tag blue">Life Membership</span><?php endif; ?>
+                    <?php if ((int)$person['monthly_subscription'] === 1): ?><span class="tag orange">Monthly</span><?php endif; ?>
+                    <?php if ((int)$person['death_insurance_enabled'] === 1): ?><span class="tag green">Death Insurance</span><?php endif; ?>
+                </div>
+
+                <div class="person-actions-v5">
+                    <a class="btn btn-primary" href="transaction_page.php?person_id=<?= (int)$person['ID'] ?>#selected_donor_position_v5">Collect Donation</a>
+                    <a class="btn" href="add_expense.php?person_id=<?= (int)$person['ID'] ?>">Add Expense / Sponsored Expense</a>
+                </div>
+
+                <div class="person-info-note-v5">
+                    <strong>Reference donor note:</strong> Expenses added from this profile are operator-handled records. The selected donor is only a reference for reporting. This does not mean the donor personally paid or made the expense.
+                </div>
             </div>
 
-            <div class="badge-list person-badges-v5">
-                <?php if ((int)$person['life_membership'] === 1): ?><span class="tag blue">Life Membership</span><?php endif; ?>
-                <?php if ((int)$person['monthly_subscription'] === 1): ?><span class="tag orange">Monthly</span><?php endif; ?>
-                <?php if ((int)$person['death_insurance_enabled'] === 1): ?><span class="tag green">Death Insurance</span><?php endif; ?>
+            <div class="person-summary-grid-v5">
+                <div class="card person-summary-card-v5">
+                    <div class="muted">Total Donations</div>
+                    <div class="summary"><?= money($totalIn) ?></div>
+                </div>
+                <div class="card person-summary-card-v5">
+                    <div class="muted">Own Donations</div>
+                    <div class="summary"><?= money($selfDonationTotal) ?></div>
+                </div>
+                <div class="card person-summary-card-v5">
+                    <div class="muted">Collected from Others</div>
+                    <div class="summary"><?= money($collectedDonationTotal) ?></div>
+                </div>
+                <div class="card person-summary-card-v5">
+                    <div class="muted">Operator-handled Expense</div>
+                    <div class="summary"><?= money($totalOut) ?></div>
+                </div>
+                <div class="card person-summary-card-v5">
+                    <div class="muted">Sponsored / Informational Value</div>
+                    <div class="summary"><?= money($localDonationValueTotal) ?></div>
+                </div>
+                <div class="card person-summary-card-v5">
+                    <div class="muted">Monthly Agreed</div>
+                    <div class="summary"><?= money((float)($plan['amount'] ?? 0)) ?></div>
+                </div>
             </div>
 
-            <div class="person-actions-v5">
-                <a class="btn btn-primary" href="transaction_page.php?person_id=<?= (int)$person['ID'] ?>#category_start_v5">Collect Donation</a>
-                <a class="btn" href="add_expense.php?person_id=<?= (int)$person['ID'] ?>">Add Expense / Sponsored Expense</a>
-                <a class="btn" href="public_donor_report.php?id=<?= (int)$person['ID'] ?>">Open Public Report</a>
+            <?php if ($plan): ?>
+            <div class="card">
+                <h2 class="section-head-v5">Monthly Plan</h2>
+                <div class="person-info-grid-v5">
+                    <div class="person-info-row-v5"><strong>Mode</strong><span><?= e(profileMethodLabel((string)$plan['payment_mode'])) ?></span></div>
+                    <div class="person-info-row-v5"><strong>Amount</strong><span><?= money((float)$plan['amount']) ?></span></div>
+                    <div class="person-info-row-v5"><strong>Status</strong><span><span class="tag <?= (int)$plan['active'] === 1 ? 'green' : 'red' ?>"><?= (int)$plan['active'] === 1 ? 'Active' : 'Suspended' ?></span></span></div>
+                    <div class="person-info-row-v5"><strong>Due / Pending Months</strong><span><?= e(implode(', ', array_slice($dueMonths, 0, 6))) ?: 'None' ?></span></div>
+                </div>
             </div>
+            <?php endif; ?>
 
-            <div class="person-info-note-v5">
-                <strong>Reference donor note:</strong> Expenses added from this profile are operator-handled records. The selected donor is only a reference for reporting. This does not mean the donor personally paid or made the expense.
+            <?php if ((int)$person['death_insurance_enabled'] === 1): ?>
+            <div class="card">
+                <h2 class="section-head-v5">Death Insurance Details</h2>
+                <div class="person-info-grid-v5">
+                    <div class="person-info-row-v5"><strong>Society</strong><span><?= e((string)($person['society_name'] ?? 'Current Mosque')) ?></span></div>
+                    <div class="person-info-row-v5"><strong>Religion / Sect</strong><span><?= e((string)$person['religion_sect']) ?></span></div>
+                    <div class="person-info-row-v5"><strong>Home Country Contact</strong><span><?= e((string)$person['home_country_reference_name']) ?><?= $person['home_town_phone'] ? ' · ' . e((string)$person['home_town_phone']) : '' ?></span></div>
+                    <div class="person-info-row-v5"><strong>Italy Contact</strong><span><?= e((string)$person['italy_reference_name']) ?><?= $person['italy_reference_phone'] ? ' · ' . e((string)$person['italy_reference_phone']) : '' ?></span></div>
+                </div>
             </div>
+            <?php endif; ?>
         </div>
 
-        <div class="person-summary-grid-v5">
-            <div class="card person-summary-card-v5">
-                <div class="muted">Total Donations</div>
-                <div class="summary"><?= money($totalIn) ?></div>
-            </div>
-            <div class="card person-summary-card-v5">
-                <div class="muted">Own Donations</div>
-                <div class="summary"><?= money($selfDonationTotal) ?></div>
-            </div>
-            <div class="card person-summary-card-v5">
-                <div class="muted">Collected from Others</div>
-                <div class="summary"><?= money($collectedDonationTotal) ?></div>
-            </div>
-            <div class="card person-summary-card-v5">
-                <div class="muted">Operator-handled Expense</div>
-                <div class="summary"><?= money($totalOut) ?></div>
-            </div>
-            <div class="card person-summary-card-v5">
-                <div class="muted">Sponsored / Informational Value</div>
-                <div class="summary"><?= money($localDonationValueTotal) ?></div>
-            </div>
-            <div class="card person-summary-card-v5">
-                <div class="muted">Monthly Agreed</div>
-                <div class="summary"><?= money((float)($plan['amount'] ?? 0)) ?></div>
-            </div>
-        </div>
+        <div class="person-profile-side-v5">
+            <div class="card qr-card-v5">
+                <h2 class="section-head-v5">Public QR / Report</h2>
 
-        <?php if ($plan): ?>
-        <div class="card">
-            <h2 class="section-head-v5">Monthly Plan</h2>
-            <div class="person-info-grid-v5">
-                <div class="person-info-row-v5"><strong>Mode</strong><span><?= e(profileMethodLabel((string)$plan['payment_mode'])) ?></span></div>
-                <div class="person-info-row-v5"><strong>Amount</strong><span><?= money((float)$plan['amount']) ?></span></div>
-                <div class="person-info-row-v5"><strong>Status</strong><span><span class="tag <?= (int)$plan['active'] === 1 ? 'green' : 'red' ?>"><?= (int)$plan['active'] === 1 ? 'Active' : 'Suspended' ?></span></span></div>
-                <div class="person-info-row-v5"><strong>Due / Pending Months</strong><span><?= e(implode(', ', array_slice($dueMonths, 0, 6))) ?: 'None' ?></span></div>
-            </div>
-        </div>
-        <?php endif; ?>
+                <div class="qr-wrap-v5">
+                    <img src="<?= e($publicQr) ?>" alt="Donor public report QR" width="220" height="220">
+                </div>
+                <div class="helper">If the QR does not scan on some phones, use the public link below. Anyone can open the page and verify with the last 3 digits of the donor phone number.</div>
+                <div class="helper person-side-note-v5">Sponsored expense values linked to this donor are reference-only records for reports. They do not mean this donor directly paid cash for the expense.</div>
+                <div class="public-link-box-v5">
+                                         
+                        <span class="public-link-text" 
+                            onclick="copyPublicLink(this)" 
+                            data-link="<?= e($publicUrl) ?>">
+                            <?= e($publicUrl) ?>
+                        </span>
 
-        <?php if ($expectedRows): ?>
-        <div class="card">
-            <div class="toolbar">
-                <h2 class="section-head-v5" style="margin:0">Expected Commitments</h2>
-                <span class="tag blue"><?= count($expectedRows) ?> record<?= count($expectedRows) === 1 ? '' : 's' ?></span>
+                        <a class="btn-open-report" 
+                        href="<?= e($publicUrl) ?>" 
+                        target="_blank" 
+                        rel="noopener">
+                        Open
+                        </a>
+
+                </div>
             </div>
 
-            <div class="person-expected-list-v5">
-                <?php foreach ($expectedRows as $row): ?>
-                    <?php
-                        $status = (string)($row['status'] ?? 'pending');
-                        $dueDate = (string)($row['due_date'] ?? '');
-                        $isOverdue = in_array($status, ['pending', 'partial'], true) && $dueDate !== '' && strtotime($dueDate) < strtotime(date('Y-m-d'));
-                        $notes = trim((string)($row['notes'] ?? ''));
-                        $extraBits = [];
+            <?php if ($expectedRows): ?>
+            <div class="card">
+                <div class="toolbar">
+                    <h2 class="section-head-v5" style="margin:0">Expected Commitments</h2>
+                    <span class="tag blue"><?= count($expectedRows) ?> record<?= count($expectedRows) === 1 ? '' : 's' ?></span>
+                </div>
 
-                        if ((int)($row['is_collected_for_others'] ?? 0) === 1) {
-                            $extraBits[] = 'Collected for others';
-                        }
-                        if (!empty($row['contributor_count'])) {
-                            $extraBits[] = 'Contributors: ' . (int)$row['contributor_count'];
-                        }
-                        if (!empty($row['source_note'])) {
-                            $extraBits[] = (string)$row['source_note'];
-                        }
-                        if ($notes !== '') {
-                            $extraBits[] = $notes;
-                        }
+                <div class="person-expected-list-v5">
+                    <?php foreach ($expectedRows as $row): ?>
+                        <?php
+                            $status = (string)($row['status'] ?? 'pending');
+                            $dueDate = (string)($row['due_date'] ?? '');
+                            $isOverdue = in_array($status, ['pending', 'partial'], true) && $dueDate !== '' && strtotime($dueDate) < strtotime(date('Y-m-d'));
+                            $notes = trim((string)($row['notes'] ?? ''));
+                            $extraBits = [];
 
-                        $canAct = in_array($status, ['pending', 'partial'], true);
-                        $collectUrl = 'transaction_page.php?person_id=' . (int)$person['ID']
-                            . '&expected_commitment_id=' . (int)$row['ID']
-                            . '&collect_now=1#category_start_v5';
-                        $editUrl = 'transaction_page.php?person_id=' . (int)$person['ID']
-                            . '&expected_commitment_id=' . (int)$row['ID']
-                            . '#category_start_v5';
-                    ?>
-                    <div class="person-expected-item-v5<?= $isOverdue ? ' is-overdue' : '' ?>">
-                        <div class="person-expected-top-v5">
-                            <div>
-                                <strong><?= e(profileCommitmentLabel($row)) ?></strong>
-                                <div class="muted">Created: <?= e((string)$row['created_at']) ?></div>
+                            if ((int)($row['is_collected_for_others'] ?? 0) === 1) {
+                                $extraBits[] = 'Collected for others';
+                            }
+                            if (!empty($row['contributor_count'])) {
+                                $extraBits[] = 'Contributors: ' . (int)$row['contributor_count'];
+                            }
+                            if (!empty($row['source_note'])) {
+                                $extraBits[] = (string)$row['source_note'];
+                            }
+                            if ($notes !== '') {
+                                $extraBits[] = $notes;
+                            }
+
+                            $canAct = in_array($status, ['pending', 'partial'], true);
+                            $collectUrl = 'transaction_page.php?person_id=' . (int)$person['ID']
+                                . '&expected_commitment_id=' . (int)$row['ID']
+                                . '&collect_now=1#category_start_v5';
+                            $editUrl = 'transaction_page.php?person_id=' . (int)$person['ID']
+                                . '&expected_commitment_id=' . (int)$row['ID']
+                                . '#category_start_v5';
+                        ?>
+                        <div class="person-expected-item-v5<?= $isOverdue ? ' is-overdue' : '' ?>">
+                            <div class="person-expected-top-v5">
+                                <div>
+                                    <strong><?= e(profileCommitmentLabel($row)) ?></strong>
+                                    <div class="muted">Created: <?= e((string)$row['created_at']) ?></div>
+                                </div>
+                                <div class="person-expected-right-v5">
+                                    <span class="tag <?= e(profileCommitmentStatusClass($status)) ?>">
+                                        <?= e(ucfirst($status)) ?>
+                                    </span>
+                                    <?php if ($isOverdue): ?>
+                                        <span class="tag red">Overdue</span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
-                            <div class="person-expected-right-v5">
-                                <span class="tag <?= e(profileCommitmentStatusClass($status)) ?>">
-                                    <?= e(ucfirst($status)) ?>
-                                </span>
-                                <?php if ($isOverdue): ?>
-                                    <span class="tag red">Overdue</span>
+
+                            <div class="person-expected-grid-v5">
+                                <div class="person-expected-cell-v5">
+                                    <span class="muted">Expected Amount</span>
+                                    <strong><?= money((float)$row['expected_amount']) ?></strong>
+                                </div>
+                                <div class="person-expected-cell-v5">
+                                    <span class="muted">Due Date</span>
+                                    <strong><?= e($dueDate !== '' ? $dueDate : '—') ?></strong>
+                                </div>
+                            </div>
+
+                            <?php if ($extraBits): ?>
+                                <div class="person-expected-notes-v5"><?= e(implode(' | ', $extraBits)) ?></div>
+                            <?php endif; ?>
+
+                            <div class="person-expected-actions-v5">
+                                <?php if ($canAct): ?>
+                                    <a class="btn btn-primary" href="<?= e($collectUrl) ?>">Collect Now</a>
+                                    <a class="btn" href="<?= e($editUrl) ?>">Edit</a>
+
+                                    <form method="post" style="display:inline;">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="commitment_action" value="mark_paid">
+                                        <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
+                                        <button type="submit" class="btn">Mark Paid</button>
+                                    </form>
+
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('Cancel this expected record?');">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="commitment_action" value="cancel">
+                                        <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
+                                        <button type="submit" class="btn">Cancel</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="muted">No action available for this status.</span>
                                 <?php endif; ?>
                             </div>
                         </div>
-
-                        <div class="person-expected-grid-v5">
-                            <div class="person-expected-cell-v5">
-                                <span class="muted">Expected Amount</span>
-                                <strong><?= money((float)$row['expected_amount']) ?></strong>
-                            </div>
-                            <div class="person-expected-cell-v5">
-                                <span class="muted">Due Date</span>
-                                <strong><?= e($dueDate !== '' ? $dueDate : '—') ?></strong>
-                            </div>
-                        </div>
-
-                        <?php if ($extraBits): ?>
-                            <div class="person-expected-notes-v5"><?= e(implode(' | ', $extraBits)) ?></div>
-                        <?php endif; ?>
-
-                        <div class="person-expected-actions-v5" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;">
-                            <?php if ($canAct): ?>
-                                <a class="btn btn-primary" href="<?= e($collectUrl) ?>">Collect Now</a>
-                                <a class="btn" href="<?= e($editUrl) ?>">Edit</a>
-
-                                <form method="post" style="display:inline;">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="commitment_action" value="mark_paid">
-                                    <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
-                                    <button type="submit" class="btn">Mark Paid</button>
-                                </form>
-
-                                <form method="post" style="display:inline;" onsubmit="return confirm('Cancel this expected record?');">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="commitment_action" value="cancel">
-                                    <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
-                                    <button type="submit" class="btn">Cancel</button>
-                                </form>
-                            <?php else: ?>
-                                <span class="muted">No action available for this status.</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+                    <?php endforeach; ?>
+                </div>
             </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
-
-        <?php if ((int)$person['death_insurance_enabled'] === 1): ?>
-        <div class="card">
-            <h2 class="section-head-v5">Death Insurance Details</h2>
-            <div class="person-info-grid-v5">
-                <div class="person-info-row-v5"><strong>Society</strong><span><?= e((string)($person['society_name'] ?? 'Current Mosque')) ?></span></div>
-                <div class="person-info-row-v5"><strong>Religion / Sect</strong><span><?= e((string)$person['religion_sect']) ?></span></div>
-                <div class="person-info-row-v5"><strong>Home Country Contact</strong><span><?= e((string)$person['home_country_reference_name']) ?><?= $person['home_town_phone'] ? ' · ' . e((string)$person['home_town_phone']) : '' ?></span></div>
-                <div class="person-info-row-v5"><strong>Italy Contact</strong><span><?= e((string)$person['italy_reference_name']) ?><?= $person['italy_reference_phone'] ? ' · ' . e((string)$person['italy_reference_phone']) : '' ?></span></div>
-            </div>
-        </div>
-        <?php endif; ?>
     </div>
 
-    <div class="person-profile-side-v5">
-        <div class="card qr-card-v5">
-            <h2 class="section-head-v5">Public QR / Report</h2>
-            <div class="qr-wrap-v5">
-                <img src="<?= e($publicQr) ?>" alt="Donor public report QR" width="220" height="220">
-            </div>
-            <div class="helper">If the QR does not scan on some phones, use the public link below. Anyone can open the page and verify with the last 3 digits of the donor phone number.</div>
-            <div class="helper person-side-note-v5">Sponsored expense values linked to this donor are reference-only records for reports. They do not mean this donor directly paid cash for the expense.</div>
-            <div class="public-link-box-v5">
-                <a href="<?= e($publicUrl) ?>" target="_blank" rel="noopener"><?= e($publicUrl) ?></a>
-            </div>
+    <div class="card person-profile-full-v5 desktop-activity-card-v5">
+        <div class="toolbar">
+            <h2 class="section-head-v5" style="margin:0">Full Activity</h2>
+            <span class="tag blue">Member ID #<?= (int)$person['ID'] ?></span>
         </div>
-
-        <div class="card desktop-activity-card-v5">
-            <div class="toolbar">
-                <h2 class="section-head-v5" style="margin:0">Full Activity</h2>
-                <span class="tag blue">Member ID #<?= (int)$person['ID'] ?></span>
-            </div>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Invoice</th>
-                            <th>Category</th>
-                            <th>Amount / Value</th>
-                            <th>Method</th>
-                            <th>Notes / Clarification</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($transactions as $row): ?>
-                        <tr>
-                            <td><?= e((string)$row['date']) ?></td>
-                            <td><?= e((string)($row['invoice_no'] ?? '—')) ?></td>
-                            <td><span class="tag orange"><?= e((string)$row['cat']) ?></span></td>
-                            <td><?= money((float)$row['amount']) ?></td>
-                            <td><?= e(profileMethodLabel((string)$row['method'])) ?></td>
-                            <td><?= e((string)$row['notes']) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <?php if (!$transactions): ?>
-                        <tr><td colspan="6" class="muted">No activity found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Invoice</th>
+                        <th>Category</th>
+                        <th>Amount / Value</th>
+                        <th>Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($transactions as $i => $row): ?>
+                    <?php $rowNotes = trim((string)($row['notes'] ?? '')); ?>
+                    <tr class="activity-row-v5<?= $rowNotes !== '' ? ' has-notes-v5' : '' ?>"<?= $rowNotes !== '' ? ' tabindex="0" role="button" aria-expanded="false"' : '' ?> data-detail-id="activity-detail-<?= (int)$i ?>">
+                        <td><?= e((string)$row['date']) ?></td>
+                        <td><?= e((string)($row['invoice_no'] ?? '—')) ?></td>
+                        <td><span class="tag orange"><?= e((string)$row['cat']) ?></span></td>
+                        <td><?= money((float)$row['amount']) ?></td>
+                        <td><?= e(profileMethodLabel((string)$row['method'])) ?></td>
+                    </tr>
+                    <?php if ($rowNotes !== ''): ?>
+                    <tr class="activity-detail-row-v5" id="activity-detail-<?= (int)$i ?>" hidden>
+                        <td colspan="5">
+                            <div class="activity-detail-box-v5">
+                                <strong>Notes / Clarification</strong>
+                                <div><?= nl2br(e($rowNotes)) ?></div>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                    <?php endforeach; ?>
+                    <?php if (!$transactions): ?>
+                    <tr><td colspan="5" class="muted">No activity found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
+    </div>
 
-        <div class="card mobile-activity-card-v5">
-            <div class="toolbar">
-                <h2 class="section-head-v5" style="margin:0">Recent Activity</h2>
-                <span class="tag blue">Last 6 months</span>
-            </div>
-            <div class="helper">Full activity ledger is shown on desktop view. Sponsored expense entries shown here are reference-only and do not mean the donor directly paid the expense.</div>
+    <div class="card person-profile-full-v5 mobile-activity-card-v5">
+        <div class="toolbar">
+            <h2 class="section-head-v5" style="margin:0">Recent Activity</h2>
+            <span class="tag blue">Last 6 months</span>
+        </div>
+        <div class="helper">Full activity ledger is shown on desktop view. Sponsored expense entries shown here are reference-only and do not mean the donor directly paid the expense.</div>
 
-            <div class="mobile-activity-list-v5">
-                <?php foreach ($mobileTransactions as $row): ?>
-                <div class="mobile-activity-item-v5">
-                    <div class="mobile-activity-top-v5">
-                        <span class="tag orange"><?= e((string)$row['cat']) ?></span>
-                        <strong><?= money((float)$row['amount']) ?></strong>
-                    </div>
-                    <div class="muted"><?= e((string)$row['date']) ?></div>
-                    <div class="mobile-activity-meta-v5"><?= e(profileMethodLabel((string)$row['method'])) ?><?= !empty($row['invoice_no']) ? ' · ' . e((string)$row['invoice_no']) : '' ?></div>
-                    <?php if (!empty($row['notes'])): ?><div class="mobile-activity-notes-v5"><?= e((string)$row['notes']) ?></div><?php endif; ?>
+        <div class="mobile-activity-list-v5">
+            <?php foreach ($mobileTransactions as $row): ?>
+            <div class="mobile-activity-item-v5">
+                <div class="mobile-activity-top-v5">
+                    <span class="tag orange"><?= e((string)$row['cat']) ?></span>
+                    <strong><?= money((float)$row['amount']) ?></strong>
                 </div>
-                <?php endforeach; ?>
-                <?php if (!$mobileTransactions): ?><div class="muted">No activity found in the last 6 months.</div><?php endif; ?>
+                <div class="muted"><?= e((string)$row['date']) ?></div>
+                <div class="mobile-activity-meta-v5"><?= e(profileMethodLabel((string)$row['method'])) ?><?= !empty($row['invoice_no']) ? ' · ' . e((string)$row['invoice_no']) : '' ?></div>
+                <?php if (!empty($row['notes'])): ?><div class="mobile-activity-notes-v5"><?= e((string)$row['notes']) ?></div><?php endif; ?>
             </div>
+            <?php endforeach; ?>
+            <?php if (!$mobileTransactions): ?><div class="muted">No activity found in the last 6 months.</div><?php endif; ?>
         </div>
     </div>
 </div>
 
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.activity-row-v5.has-notes-v5').forEach(function (row) {
+        var detailId = row.getAttribute('data-detail-id');
+        var detailRow = detailId ? document.getElementById(detailId) : null;
+        if (!detailRow) return;
+
+        var toggle = function () {
+            var isHidden = detailRow.hasAttribute('hidden');
+            if (isHidden) {
+                detailRow.removeAttribute('hidden');
+                row.setAttribute('aria-expanded', 'true');
+                row.classList.add('is-open-v5');
+            } else {
+                detailRow.setAttribute('hidden', 'hidden');
+                row.setAttribute('aria-expanded', 'false');
+                row.classList.remove('is-open-v5');
+            }
+        };
+
+        row.addEventListener('click', function () {
+            toggle();
+        });
+
+        row.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggle();
+            }
+        });
+    });
+});
+</script>
+<script>
+function copyPublicLink(el){
+    const link = el.getAttribute('data-link');
+
+    navigator.clipboard.writeText(link).then(()=>{
+        const original = el.innerText;
+        el.innerText = "Copied ✓";
+        
+        setTimeout(()=>{
+            el.innerText = original;
+        }, 1500);
+    });
+}
+</script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

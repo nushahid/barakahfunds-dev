@@ -348,6 +348,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
     $paymentMethod = (string)($_POST['payment_method'] ?? 'cash');
     $notes = trim((string)($_POST['notes'] ?? ''));
     $date = trim((string)($_POST['transaction_date'] ?? date('Y-m-d')));
+
+    if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        $errors[] = 'Invalid date.';
+    }
+
+    $currentTime = date('H:i:s');
+    $createdAt = $date . ' ' . $currentTime;
     $eventId = (int)($_POST['event_id'] ?? 0);
 
     $isExpected = (int)($_POST['is_expected'] ?? 0) === 1;
@@ -516,7 +523,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                         $amount,
                         $notes !== '' ? $notes : 'Event donation',
                         $uid,
-                        $date . ' 00:00:00'
+                        $createdAt
                     ]);
                     $referenceId = (int)$pdo->lastInsertId();
                 } else {
@@ -541,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                         $paymentMethod,
                         $notes,
                         $uid,
-                        $date . ' 00:00:00'
+                        $createdAt
                     ]);
                 }
 
@@ -566,7 +573,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                     $paymentMethod,
                     $notes,
                     $uid,
-                    $date . ' 00:00:00'
+                    $createdAt
                 ]);
                 $referenceId = (int)$pdo->lastInsertId();
             }
@@ -625,7 +632,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                     $isCollectedForOthers && $contributorCount > 0 ? $contributorCount : null,
                     $isCollectedForOthers && $sourceNote !== '' ? $sourceNote : null,
                     $uid,
-                    $date . ' 00:00:00'
+                    $createdAt
                 ]);
             } else {
                 $ledgerStmt = $pdo->prepare('
@@ -646,7 +653,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                     $receiptToken,
                     $finalNotes,
                     $uid,
-                    $date . ' 00:00:00'
+                    $createdAt
                 ]);
             }
 
@@ -702,7 +709,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
 }
 
 $events = function_exists('getEvents') ? getEvents($pdo) : [];
-$autoJumpToCategory = $selectedDonorId > 0 && $selectedDonor && $_SERVER['REQUEST_METHOD'] !== 'POST';
+$autoFocusSelectedDonor = $selectedDonorId > 0 && $selectedDonor && $_SERVER['REQUEST_METHOD'] !== 'POST';
 $isEditExpectation = $editingCommitment && !$collectNowMode;
 $isCollectFromExpectation = $editingCommitment && $collectNowMode;
 
@@ -777,7 +784,8 @@ require_once __DIR__ . '/includes/header.php';
         <input type="hidden" name="q" value="<?= e($q) ?>">
         <input type="hidden" name="expected_commitment_id" value="<?= (int)$expectedCommitmentId ?>">
 
-        <div id="selected_donor_box" class="collect-selected-v5<?= $selectedDonor ? ' is-selected' : '' ?>">
+        <div id="selected_donor_position_v5" class="collect-anchor-v5"></div>
+        <div id="selected_donor_box" class="collect-selected-v5<?= $selectedDonor ? ' is-selected' : '' ?>" tabindex="-1">
             <div class="muted">Selected donor</div>
             <div id="selected_donor_name" class="collect-selected-name-v5">
                 <?= e((string)($selectedDonor['name'] ?? 'No donor selected')) ?>
@@ -944,6 +952,7 @@ require_once __DIR__ . '/includes/header.php';
 <script>
 (function () {
     const resultWrap = document.getElementById('donor_results');
+    const donorAnchor = document.getElementById('selected_donor_position_v5');
     const personInput = document.getElementById('person_id');
     const selectedBox = document.getElementById('selected_donor_box');
     const selectedName = document.getElementById('selected_donor_name');
@@ -963,38 +972,91 @@ require_once __DIR__ . '/includes/header.php';
     const saveButton = document.getElementById('collect_submit_btn');
     const expectedCommitmentId = <?= (int)$expectedCommitmentId ?>;
 
+    function scrollToDonorAnchor() {
+        const anchor = donorAnchor || selectedBox;
+        if (!anchor) return;
+        const top = anchor.getBoundingClientRect().top + window.pageYOffset - 16;
+        if (top >= 0) {
+            window.scrollTo({ top: top, left: 0, behavior: 'auto' });
+        }
+    }
+
+    requestAnimationFrame(function () {
+        if (window.location.hash === '#selected_donor_position_v5') {
+            scrollToDonorAnchor();
+            return;
+        }
+        if (window.location.hash) return;
+        if (selectedBox && personInput && parseInt(personInput.value || '0', 10) > 0) {
+            scrollToDonorAnchor();
+        }
+    });
+
     function enableFields() {
         fieldSection.classList.remove('is-disabled');
         selectedBox.classList.add('is-selected');
     }
 
-    function goCategory() {
-        const target = document.getElementById('category_start_v5');
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    function focusSelectedDonorCard() {
+        if (!selectedBox) return;
+        try {
+            selectedBox.focus({ preventScroll: true });
+        } catch (err) {
+            selectedBox.focus();
         }
     }
 
+    function lockScrollPosition(scrollTop) {
+        requestAnimationFrame(function () {
+            window.scrollTo({ top: scrollTop, left: 0, behavior: 'auto' });
+            requestAnimationFrame(function () {
+                window.scrollTo({ top: scrollTop, left: 0, behavior: 'auto' });
+            });
+        });
+    }
+
     function selectDonor(id, name, city, phone) {
+        const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        const activeEl = document.activeElement;
+
+        if (activeEl && typeof activeEl.blur === 'function') {
+            activeEl.blur();
+        }
+
         personInput.value = id;
         selectedName.textContent = name || 'Selected donor';
         selectedMeta.textContent = ['ID ' + id, city || '', phone || ''].filter(Boolean).join(' · ');
         enableFields();
 
         if (resultWrap) {
+            resultWrap.style.visibility = 'hidden';
+            resultWrap.style.pointerEvents = 'none';
+            resultWrap.style.maxHeight = resultWrap.offsetHeight + 'px';
             resultWrap.innerHTML = '';
-            resultWrap.style.display = 'none';
         }
 
-        goCategory();
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search + '#selected_donor_position_v5');
+        }
+        requestAnimationFrame(function () {
+            scrollToDonorAnchor();
+            lockScrollPosition(window.pageYOffset || currentScrollTop);
+        });
     }
 
     if (resultWrap) {
+        resultWrap.addEventListener('mousedown', function (e) {
+            const btn = e.target.closest('.collect-donor-result-v5');
+            if (!btn) return;
+            e.preventDefault();
+        });
+
         resultWrap.addEventListener('click', function (e) {
             const btn = e.target.closest('.collect-donor-result-v5');
             if (!btn) return;
 
             e.preventDefault();
+            e.stopPropagation();
             selectDonor(
                 btn.dataset.donorId || '',
                 btn.dataset.donorName || '',
@@ -1073,9 +1135,11 @@ require_once __DIR__ . '/includes/header.php';
     syncSourceFields();
     syncExpectedFields();
 
-    if (<?= $autoJumpToCategory ? 'true' : 'false' ?>) {
+    if (<?= $autoFocusSelectedDonor ? 'true' : 'false' ?>) {
         enableFields();
-        window.setTimeout(goCategory, 120);
+        if (window.location.hash === '#selected_donor_position_v5') {
+            requestAnimationFrame(scrollToDonorAnchor);
+        }
     }
 })();
 </script>

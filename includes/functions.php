@@ -1,4 +1,7 @@
 <?php
+
+date_default_timezone_set('Europe/Rome');
+
 function startSecureSession(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
