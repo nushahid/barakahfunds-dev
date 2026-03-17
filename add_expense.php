@@ -16,6 +16,79 @@ function ex_old(string $key, string $default = ''): string
     return isset($_POST[$key]) ? trim((string)$_POST[$key]) : $default;
 }
 
+function ensureExpenseReceiptUploadDir(string $dirPath): bool
+{
+    if (is_dir($dirPath)) {
+        return is_writable($dirPath);
+    }
+
+    return @mkdir($dirPath, 0775, true) && is_writable($dirPath);
+}
+
+function handleExpenseReceiptUpload(array $file): array
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return ['path' => null, 'error' => null];
+    }
+
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        return ['path' => null, 'error' => 'Receipt upload failed. Please try again.'];
+    }
+
+    $maxBytes = 10 * 1024 * 1024;
+    $tmpName = (string)($file['tmp_name'] ?? '');
+    $originalName = (string)($file['name'] ?? 'receipt');
+    $fileSize = (int)($file['size'] ?? 0);
+
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        return ['path' => null, 'error' => 'Uploaded receipt file is invalid.'];
+    }
+
+    if ($fileSize <= 0) {
+        return ['path' => null, 'error' => 'Uploaded receipt file is empty.'];
+    }
+
+    if ($fileSize > $maxBytes) {
+        return ['path' => null, 'error' => 'Receipt file must be 10MB or smaller.'];
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string)$finfo->file($tmpName);
+    $allowed = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/heic' => 'heic',
+        'image/heif' => 'heif',
+        'application/pdf' => 'pdf',
+    ];
+
+    if (!isset($allowed[$mime])) {
+        return ['path' => null, 'error' => 'Only PDF, JPG, JPEG, PNG, WEBP, HEIC, and HEIF receipt files are allowed.'];
+    }
+
+    $uploadDirFs = __DIR__ . '/uploads/expense_receipts';
+    if (!ensureExpenseReceiptUploadDir($uploadDirFs)) {
+        return ['path' => null, 'error' => 'Receipt upload folder is not writable.'];
+    }
+
+    $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+    $safeBaseName = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $baseName) ?: 'receipt';
+    $safeBaseName = trim($safeBaseName, '-');
+    if ($safeBaseName === '') {
+        $safeBaseName = 'receipt';
+    }
+
+    $fileName = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '_' . $safeBaseName . '.' . $allowed[$mime];
+    $destinationFs = $uploadDirFs . '/' . $fileName;
+
+    if (!move_uploaded_file($tmpName, $destinationFs)) {
+        return ['path' => null, 'error' => 'Could not save uploaded receipt file.'];
+    }
+
+    return ['path' => './uploads/expense_receipts/' . $fileName, 'error' => null];
+}
+
 function loadExpensePersonById(PDO $pdo, int $personId): ?array
 {
     if ($personId <= 0 || !tableExists($pdo, 'people')) {
@@ -117,6 +190,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === '
         $errors[] = 'Expense table was not found in database.';
     }
 
+    $uploadedReceiptPath = null;
+    if (function_exists('columnExists') && columnExists($pdo, 'expense', 'media')) {
+        $receiptUpload = handleExpenseReceiptUpload($_FILES['expense_receipt'] ?? []);
+        if (!empty($receiptUpload['error'])) {
+            $errors[] = (string)$receiptUpload['error'];
+        } else {
+            $uploadedReceiptPath = $receiptUpload['path'] ?? null;
+        }
+    }
+
     if (!$errors) {
         $contextBits = [];
         $contextBits[] = 'Handled by operator: ' . (string)($operatorPerson['name'] ?? 'Unknown');
@@ -152,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === '
 
         if (function_exists('columnExists') && columnExists($pdo, 'expense', 'media')) {
             $insertCols[] = 'media';
-            $insertVals[] = null;
+            $insertVals[] = $uploadedReceiptPath;
         }
 
         $placeholders = implode(', ', array_fill(0, count($insertCols), '?'));
@@ -433,7 +516,7 @@ body.page-add-expense .add-expense-static-value-v2{
         This expense is always paid or handled by the operator. The selected donor is only a reference for reporting. It is not expense made by that person.
     </div>
 
-    <form method="post" id="add_expense_form_v2" class="stack add-expense-form-v2">
+    <form method="post" enctype="multipart/form-data" id="add_expense_form_v2" class="stack add-expense-form-v2">
         <?= csrfField() ?>
         <input type="hidden" name="form_action" value="save_expense">
         <input type="hidden" name="operator_person_id" value="<?= (int)$operatorLinkedPersonId ?>">
@@ -516,6 +599,14 @@ body.page-add-expense .add-expense-static-value-v2{
             <div class="add-expense-field-v2">
                 <label>Notes</label>
                 <input type="text" name="notes" value="<?= e(ex_old('notes')) ?>" placeholder="Optional note">
+            </div>
+        </div>
+
+        <div class="add-expense-field-full-v2 add-expense-upload-field-v2">
+            <label for="expense_receipt_v2">Receipt Upload</label>
+            <input type="file" name="expense_receipt" id="expense_receipt_v2" accept="image/*,application/pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" capture="environment">
+            <div class="add-expense-upload-help-v2">
+                Upload receipt in PDF or image format. On phone, this can open the back camera to take photo of the slip.
             </div>
         </div>
 

@@ -194,6 +194,7 @@ require_once __DIR__ . '/includes/header.php';
         <div class="switch-row">
             <div>
                 <strong>Life Membership</strong>
+                
                 <div class="muted">Turn on only if the donor is a life member.</div>
             </div>
             <label><input id="life_membership" data-toggle-target="life_fields" type="checkbox" name="life_membership" value="1" <?= !empty($form['life_membership']) ? 'checked' : '' ?>> Active</label>
@@ -201,7 +202,22 @@ require_once __DIR__ . '/includes/header.php';
 
         <div id="life_fields" class="inline-grid-2 donor-main-grid-v5">
             <div>
-                <label>Life Membership Amount</label>
+            <label class="label-with-info">
+  Life Membership Amount
+
+  <span class="info-icon" onclick="toggleInfo(this)">
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/>
+      <line x1="12" y1="10" x2="12" y2="16" stroke="white" stroke-width="2"/>
+      <circle cx="12" cy="7" r="1.5" fill="white"/>
+    </svg>
+  </span>
+
+  <span class="info-tooltip">
+    This amount is only stored for record purposes. It does not create a payment or automatic collection.
+  </span>
+</label>
+                
                 <input type="number" step="0.01" min="0" name="life_membership_amount" value="<?= e((string)$form['life_membership_amount']) ?>">
             </div>
             <div>
@@ -220,7 +236,19 @@ require_once __DIR__ . '/includes/header.php';
 
         <div id="monthly_fields" class="stack compact">
             <div>
-                <label>Monthly Amount</label>
+                <label class="label-with-info">
+  Monthly Amount
+  <span class="info-icon" onclick="toggleInfo(this)">
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/>
+      <line x1="12" y1="10" x2="12" y2="16" stroke="white" stroke-width="2"/>
+      <circle cx="12" cy="7" r="1.5" fill="white"/>
+    </svg>
+  </span>
+  <span class="info-tooltip">
+    This is the expected monthly contribution amount for this member.
+  </span>
+</label>
                 <input type="number" id="monthly_amount" step="0.01" min="0" name="monthly_amount" value="<?= e((string)$form['monthly_amount']) ?>">
                 <div class="donor-amount-suggestions-v5">
                     <button type="button" class="btn" onclick="document.getElementById('monthly_amount').value='20.00'">20</button>
@@ -336,5 +364,25 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </form>
 </div>
+<script>
+function toggleInfo(el){
+    const tooltip = el.parentElement.querySelector('.info-tooltip');
 
+    document.querySelectorAll('.info-tooltip').forEach(function(t){
+        if(t !== tooltip){
+            t.style.display = 'none';
+        }
+    });
+
+    tooltip.style.display = (tooltip.style.display === 'block') ? 'none' : 'block';
+}
+
+document.addEventListener('click', function(e){
+    if(!e.target.closest('.label-with-info')){
+        document.querySelectorAll('.info-tooltip').forEach(function(t){
+            t.style.display = 'none';
+        });
+    }
+});
+</script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

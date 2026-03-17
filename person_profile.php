@@ -11,6 +11,108 @@ if ($id <= 0) {
     exit;
 }
 
+$uid = function_exists('getLoggedInUserId') ? (int)getLoggedInUserId() : 0;
+
+function profileMethodLabel(string $method): string {
+    return match ($method) {
+        'cash_manual', 'cash' => 'Cash',
+        'bank_manual', 'bank' => 'Bank',
+        'pos' => 'POS',
+        'stripe_auto', 'stripe' => 'Stripe',
+        'online' => 'Online',
+        'no-cash' => 'No Cash',
+        default => $method !== '' ? ucwords(str_replace('_', ' ', $method)) : '—',
+    };
+}
+
+function profileCommitmentLabel(array $row): string {
+    $category = (string)($row['category'] ?? '');
+    return match ($category) {
+        'monthly' => 'Monthly Expected',
+        'event' => !empty($row['event_name']) ? 'Event · ' . (string)$row['event_name'] : 'Event Expected',
+        default => 'One-Time Expected',
+    };
+}
+
+function profileCommitmentStatusClass(string $status): string {
+    return match ($status) {
+        'paid' => 'green',
+        'partial' => 'blue',
+        'cancelled', 'expired' => 'red',
+        default => 'orange',
+    };
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && tableExists($pdo, 'donation_commitments')) {
+    verifyCsrfOrFail();
+
+    $action = (string)($_POST['commitment_action'] ?? '');
+    $commitmentId = (int)($_POST['commitment_id'] ?? 0);
+
+    if ($commitmentId > 0 && in_array($action, ['mark_paid', 'cancel'], true)) {
+        $stmt = $pdo->prepare('
+            SELECT ID, person_id, category, expected_amount, due_date, status, event_id
+            FROM donation_commitments
+            WHERE ID = ? AND person_id = ?
+            LIMIT 1
+        ');
+        $stmt->execute([$commitmentId, $id]);
+        $commitment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$commitment) {
+            setFlash('error', 'Expected record not found.');
+            header('Location: person_profile.php?id=' . $id);
+            exit;
+        }
+
+        if ($action === 'mark_paid') {
+            $stmt = $pdo->prepare('UPDATE donation_commitments SET status = ?, updated_at = NOW() WHERE ID = ?');
+            $stmt->execute(['paid', $commitmentId]);
+
+            if (function_exists('systemLog')) {
+                systemLog($pdo, $uid, 'donation_expectation', 'mark_paid', 'Marked expected donation as paid', $commitmentId);
+            }
+
+            if (function_exists('personLog')) {
+                personLog(
+                    $pdo,
+                    $uid,
+                    $id,
+                    'donation_expectation',
+                    'Marked expected ' . $commitment['category'] . ' donation of ' . number_format((float)$commitment['expected_amount'], 2, '.', '') . ' as paid'
+                );
+            }
+
+            setFlash('success', 'Expected record marked as paid.');
+            header('Location: person_profile.php?id=' . $id);
+            exit;
+        }
+
+        if ($action === 'cancel') {
+            $stmt = $pdo->prepare('UPDATE donation_commitments SET status = ?, updated_at = NOW() WHERE ID = ?');
+            $stmt->execute(['cancelled', $commitmentId]);
+
+            if (function_exists('systemLog')) {
+                systemLog($pdo, $uid, 'donation_expectation', 'cancel', 'Cancelled expected donation', $commitmentId);
+            }
+
+            if (function_exists('personLog')) {
+                personLog(
+                    $pdo,
+                    $uid,
+                    $id,
+                    'donation_expectation',
+                    'Cancelled expected ' . $commitment['category'] . ' donation of ' . number_format((float)$commitment['expected_amount'], 2, '.', '')
+                );
+            }
+
+            setFlash('success', 'Expected record cancelled.');
+            header('Location: person_profile.php?id=' . $id);
+            exit;
+        }
+    }
+}
+
 $stmt = $pdo->prepare('
     SELECT p.*, s.name AS society_name
     FROM people p
@@ -37,6 +139,8 @@ $totalOut = 0;
 $selfDonationTotal = 0;
 $collectedDonationTotal = 0;
 $localDonationValueTotal = 0;
+
+$expectedRows = [];
 
 $hasSourceColumns = function_exists('columnExists')
     && tableExists($pdo, 'operator_ledger')
@@ -109,7 +213,7 @@ if (tableExists($pdo, 'expense')) {
     $dateSelect = $hasExpenseDate ? 'e.expense_date' : 'DATE(e.created_at)';
     $donationSelect = $hasDonationFlag ? 'e.donation' : '0';
 
-    $stmt = $pdo->prepare(" 
+    $stmt = $pdo->prepare("
         SELECT
             e.ID,
             {$dateSelect} AS date,
@@ -137,6 +241,82 @@ foreach ($expenseRows as $row) {
         $localDonationValueTotal += (float)$row['amount'];
     } else {
         $totalOut += (float)$row['amount'];
+    }
+}
+
+if (tableExists($pdo, 'donation_commitments')) {
+    $hasExpectedSourceColumns =
+        function_exists('columnExists')
+        && columnExists($pdo, 'donation_commitments', 'is_collected_for_others')
+        && columnExists($pdo, 'donation_commitments', 'contributor_count')
+        && columnExists($pdo, 'donation_commitments', 'source_note');
+
+    if ($hasExpectedSourceColumns) {
+        $stmt = $pdo->prepare('
+            SELECT
+                dc.ID,
+                dc.category,
+                dc.event_id,
+                dc.expected_amount,
+                dc.due_date,
+                dc.status,
+                dc.notes,
+                dc.created_at,
+                dc.is_collected_for_others,
+                dc.contributor_count,
+                dc.source_note,
+                ev.name AS event_name
+            FROM donation_commitments dc
+            LEFT JOIN events ev ON ev.ID = dc.event_id
+            WHERE dc.person_id = ?
+            ORDER BY
+                CASE
+                    WHEN dc.status = "pending" THEN 0
+                    WHEN dc.status = "partial" THEN 1
+                    WHEN dc.status = "paid" THEN 2
+                    WHEN dc.status = "cancelled" THEN 3
+                    WHEN dc.status = "expired" THEN 4
+                    ELSE 5
+                END,
+                dc.due_date ASC,
+                dc.ID DESC
+            LIMIT 100
+        ');
+        $stmt->execute([$id]);
+        $expectedRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $stmt = $pdo->prepare('
+            SELECT
+                dc.ID,
+                dc.category,
+                dc.event_id,
+                dc.expected_amount,
+                dc.due_date,
+                dc.status,
+                dc.notes,
+                dc.created_at,
+                0 AS is_collected_for_others,
+                NULL AS contributor_count,
+                NULL AS source_note,
+                ev.name AS event_name
+            FROM donation_commitments dc
+            LEFT JOIN events ev ON ev.ID = dc.event_id
+            WHERE dc.person_id = ?
+            ORDER BY
+                CASE
+                    WHEN dc.status = "pending" THEN 0
+                    WHEN dc.status = "partial" THEN 1
+                    WHEN dc.status = "paid" THEN 2
+                    WHEN dc.status = "cancelled" THEN 3
+                    WHEN dc.status = "expired" THEN 4
+                    ELSE 5
+                END,
+                dc.due_date ASC,
+                dc.ID DESC
+            LIMIT 100
+        ');
+        $stmt->execute([$id]);
+        $expectedRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 
@@ -183,18 +363,6 @@ $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''))
 $publicPath = ($basePath !== '' ? $basePath : '') . '/public_donor_report.php?id=' . (int)$person['ID'];
 $publicUrl = ($host !== '' ? ($scheme . '://' . $host . $publicPath) : ('public_donor_report.php?id=' . (int)$person['ID']));
 $publicQr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . urlencode($publicUrl);
-
-function profileMethodLabel(string $method): string {
-    return match ($method) {
-        'cash_manual', 'cash' => 'Cash',
-        'bank_manual', 'bank' => 'Bank',
-        'pos' => 'POS',
-        'stripe_auto', 'stripe' => 'Stripe',
-        'online' => 'Online',
-        'no-cash' => 'No Cash',
-        default => $method !== '' ? ucwords(str_replace('_', ' ', $method)) : '—',
-    };
-}
 
 $pageClass = 'page-person-profile';
 require_once __DIR__ . '/includes/header.php';
@@ -267,6 +435,102 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="person-info-row-v5"><strong>Amount</strong><span><?= money((float)$plan['amount']) ?></span></div>
                 <div class="person-info-row-v5"><strong>Status</strong><span><span class="tag <?= (int)$plan['active'] === 1 ? 'green' : 'red' ?>"><?= (int)$plan['active'] === 1 ? 'Active' : 'Suspended' ?></span></span></div>
                 <div class="person-info-row-v5"><strong>Due / Pending Months</strong><span><?= e(implode(', ', array_slice($dueMonths, 0, 6))) ?: 'None' ?></span></div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($expectedRows): ?>
+        <div class="card">
+            <div class="toolbar">
+                <h2 class="section-head-v5" style="margin:0">Expected Commitments</h2>
+                <span class="tag blue"><?= count($expectedRows) ?> record<?= count($expectedRows) === 1 ? '' : 's' ?></span>
+            </div>
+
+            <div class="person-expected-list-v5">
+                <?php foreach ($expectedRows as $row): ?>
+                    <?php
+                        $status = (string)($row['status'] ?? 'pending');
+                        $dueDate = (string)($row['due_date'] ?? '');
+                        $isOverdue = in_array($status, ['pending', 'partial'], true) && $dueDate !== '' && strtotime($dueDate) < strtotime(date('Y-m-d'));
+                        $notes = trim((string)($row['notes'] ?? ''));
+                        $extraBits = [];
+
+                        if ((int)($row['is_collected_for_others'] ?? 0) === 1) {
+                            $extraBits[] = 'Collected for others';
+                        }
+                        if (!empty($row['contributor_count'])) {
+                            $extraBits[] = 'Contributors: ' . (int)$row['contributor_count'];
+                        }
+                        if (!empty($row['source_note'])) {
+                            $extraBits[] = (string)$row['source_note'];
+                        }
+                        if ($notes !== '') {
+                            $extraBits[] = $notes;
+                        }
+
+                        $canAct = in_array($status, ['pending', 'partial'], true);
+                        $collectUrl = 'transaction_page.php?person_id=' . (int)$person['ID']
+                            . '&expected_commitment_id=' . (int)$row['ID']
+                            . '&collect_now=1#category_start_v5';
+                        $editUrl = 'transaction_page.php?person_id=' . (int)$person['ID']
+                            . '&expected_commitment_id=' . (int)$row['ID']
+                            . '#category_start_v5';
+                    ?>
+                    <div class="person-expected-item-v5<?= $isOverdue ? ' is-overdue' : '' ?>">
+                        <div class="person-expected-top-v5">
+                            <div>
+                                <strong><?= e(profileCommitmentLabel($row)) ?></strong>
+                                <div class="muted">Created: <?= e((string)$row['created_at']) ?></div>
+                            </div>
+                            <div class="person-expected-right-v5">
+                                <span class="tag <?= e(profileCommitmentStatusClass($status)) ?>">
+                                    <?= e(ucfirst($status)) ?>
+                                </span>
+                                <?php if ($isOverdue): ?>
+                                    <span class="tag red">Overdue</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <div class="person-expected-grid-v5">
+                            <div class="person-expected-cell-v5">
+                                <span class="muted">Expected Amount</span>
+                                <strong><?= money((float)$row['expected_amount']) ?></strong>
+                            </div>
+                            <div class="person-expected-cell-v5">
+                                <span class="muted">Due Date</span>
+                                <strong><?= e($dueDate !== '' ? $dueDate : '—') ?></strong>
+                            </div>
+                        </div>
+
+                        <?php if ($extraBits): ?>
+                            <div class="person-expected-notes-v5"><?= e(implode(' | ', $extraBits)) ?></div>
+                        <?php endif; ?>
+
+                        <div class="person-expected-actions-v5" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;">
+                            <?php if ($canAct): ?>
+                                <a class="btn btn-primary" href="<?= e($collectUrl) ?>">Collect Now</a>
+                                <a class="btn" href="<?= e($editUrl) ?>">Edit</a>
+
+                                <form method="post" style="display:inline;">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="commitment_action" value="mark_paid">
+                                    <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
+                                    <button type="submit" class="btn">Mark Paid</button>
+                                </form>
+
+                                <form method="post" style="display:inline;" onsubmit="return confirm('Cancel this expected record?');">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="commitment_action" value="cancel">
+                                    <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
+                                    <button type="submit" class="btn">Cancel</button>
+                                </form>
+                            <?php else: ?>
+                                <span class="muted">No action available for this status.</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
         <?php endif; ?>
