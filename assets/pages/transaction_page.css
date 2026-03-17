@@ -1,3 +1,4 @@
+
 body.page-transaction-page .collect-card-v5{
     max-width:980px;
     margin:0 auto 24px;
@@ -257,4 +258,162 @@ body.page-transaction-page .collect-card-option-v5 input:checked + .collect-card
 
 body.page-transaction-page .collect-category-grid-v5 .collect-card-pill-v5{
     min-height:112px;
+}
+
+
+body.page-transaction-page .collect-toggle-card-v5{
+    border:1px solid #fdba74;
+    border-radius:20px;
+    background:#fffaf3;
+    padding:16px 18px;
+}
+
+body.page-transaction-page .collect-toggle-card-end-v5{
+    margin-top:2px;
+}
+
+body.page-transaction-page .collect-toggle-row-v5{
+    display:flex;
+    align-items:flex-start;
+    gap:16px;
+    cursor:pointer;
+}
+
+body.page-transaction-page .collect-toggle-switch-v5{
+    position:relative;
+    flex:0 0 auto;
+    width:84px;
+    height:40px;
+    display:inline-block;
+}
+
+body.page-transaction-page .collect-toggle-switch-v5 input{
+    position:absolute;
+    opacity:0;
+    inset:0;
+    width:100%;
+    height:100%;
+    margin:0;
+    cursor:pointer;
+    z-index:2;
+}
+
+body.page-transaction-page .collect-toggle-slider-v5{
+    position:absolute;
+    inset:0;
+    border-radius:999px;
+    background:#fdba74;
+    transition:.2s ease;
+}
+
+body.page-transaction-page .collect-toggle-slider-v5::after{
+    content:'';
+    position:absolute;
+    top:4px;
+    left:4px;
+    width:32px;
+    height:32px;
+    border-radius:50%;
+    background:#f8fafc;
+    box-shadow:0 1px 3px rgba(15,23,42,.18);
+    transition:.2s ease;
+}
+
+body.page-transaction-page .collect-toggle-switch-v5 input:checked + .collect-toggle-slider-v5{
+    background:#fb923c;
+}
+
+body.page-transaction-page .collect-toggle-switch-v5 input:checked + .collect-toggle-slider-v5::after{
+    transform:translateX(44px);
+}
+
+body.page-transaction-page .collect-toggle-content-v5{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:0;
+    padding-top:2px;
+}
+
+body.page-transaction-page .collect-toggle-title-v5{
+    font-size:16px;
+    font-weight:800;
+    color:#431407;
+    line-height:1.25;
+}
+
+body.page-transaction-page .collect-toggle-help-v5{
+    font-size:13px;
+    line-height:1.5;
+    color:#9a3412;
+}
+
+body.page-transaction-page .collect-toggle-fields-v5{
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid #fed7aa;
+}
+
+body.page-transaction-page .collect-inline-note-v5{
+    display:flex;
+    align-items:flex-end;
+}
+
+body.page-transaction-page .collect-payment-option-v5 .collect-card-pill-v5{
+    min-height:76px;
+    padding:10px 6px;
+    gap:6px;
+}
+
+body.page-transaction-page .collect-payment-row-v5{
+    gap:8px;
+}
+
+body.page-transaction-page .collect-payment-option-v5 .collect-card-pill-v5 .icon{
+    font-size:21px;
+}
+
+body.page-transaction-page .collect-selected-v5,
+body.page-transaction-page .collect-toggle-card-v5{
+    box-shadow:0 8px 20px rgba(15,23,42,.04);
+}
+
+@media (max-width:960px){
+    body.page-transaction-page .collect-toggle-card-v5{
+        padding:15px 14px;
+    }
+
+    body.page-transaction-page .collect-toggle-row-v5{
+        gap:12px;
+    }
+
+    body.page-transaction-page .collect-toggle-switch-v5{
+        width:76px;
+        height:36px;
+    }
+
+    body.page-transaction-page .collect-toggle-slider-v5::after{
+        width:28px;
+        height:28px;
+    }
+
+    body.page-transaction-page .collect-toggle-switch-v5 input:checked + .collect-toggle-slider-v5::after{
+        transform:translateX(40px);
+    }
+}
+
+@media (max-width:720px){
+    body.page-transaction-page .collect-toggle-row-v5{
+        align-items:center;
+    }
+
+    body.page-transaction-page .collect-payment-row-v5{
+        grid-template-columns:repeat(5,minmax(0,1fr));
+    }
+
+    body.page-transaction-page .collect-payment-option-v5 .collect-card-pill-v5{
+        min-height:72px;
+        font-size:11px;
+        padding:10px 4px;
+    }
 }

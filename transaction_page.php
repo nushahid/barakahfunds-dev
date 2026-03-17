@@ -798,6 +798,32 @@ require_once __DIR__ . '/includes/header.php';
         <?php endif; ?>
 
         <div id="collect_fields_section" class="<?= $selectedDonor ? '' : 'is-disabled' ?>">
+            <div class="collect-toggle-card-v5">
+                <label class="collect-toggle-row-v5" for="is_expected">
+                    <span class="collect-toggle-switch-v5">
+                        <input type="checkbox" name="is_expected" id="is_expected" value="1" <?= tx_old('is_expected', '') ? 'checked' : '' ?>>
+                        <span class="collect-toggle-slider-v5"></span>
+                    </span>
+                    <span class="collect-toggle-content-v5">
+                        <span class="collect-toggle-title-v5">Expected Only</span>
+                        <span class="collect-toggle-help-v5">Turn on to save this as commitment only. It will not add into final collected total until actually paid.</span>
+                    </span>
+                </label>
+                <div id="expected_fields" class="stack compact collect-conditional-v5 collect-toggle-fields-v5<?= tx_old('is_expected', '') ? '' : ' hidden' ?>">
+                    <div class="collect-date-notes-grid-v5">
+                        <div>
+                            <label>Due Date</label>
+                            <input type="date" name="due_date" id="due_date" value="<?= e((string)tx_old('due_date', '')) ?>">
+                        </div>
+                        <div class="collect-inline-note-v5">
+                            <div class="muted">
+                                Expected mode will not create receipt and will not add this amount to final donation totals.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="category_start_v5" class="section-title">Category</div>
             <div class="collect-category-grid-v5" id="category_grid">
                 <?php foreach ([
@@ -813,41 +839,6 @@ require_once __DIR__ . '/includes/header.php';
                         </span>
                     </label>
                 <?php endforeach; ?>
-            </div>
-
-            <div class="section-title">Mode</div>
-            <div class="collect-toggle-grid-v5">
-                <label class="collect-card-option-v5">
-                    <input type="checkbox" name="is_expected" id="is_expected" value="1" <?= tx_old('is_expected', '') ? 'checked' : '' ?>>
-                    <span class="collect-card-pill-v5 collect-toggle-pill-v5">
-                        <span class="icon">⏳</span>
-                        <span>Expected Only</span>
-                        <small>Not final payment yet</small>
-                    </span>
-                </label>
-
-                <label class="collect-card-option-v5">
-                    <input type="checkbox" name="collected_for_others" id="collected_for_others" value="1" <?= tx_old('collected_for_others', '') ? 'checked' : '' ?>>
-                    <span class="collect-card-pill-v5 collect-toggle-pill-v5">
-                        <span class="icon">👥</span>
-                        <span>Collected for Others</span>
-                        <small>Amount gathered from group</small>
-                    </span>
-                </label>
-            </div>
-
-            <div id="expected_fields" class="stack compact collect-conditional-v5<?= tx_old('is_expected', '') ? '' : ' hidden' ?>">
-                <div class="collect-date-notes-grid-v5">
-                    <div>
-                        <label>Due Date</label>
-                        <input type="date" name="due_date" id="due_date" value="<?= e((string)tx_old('due_date', '')) ?>">
-                    </div>
-                    <div class="collect-inline-note-v5">
-                        <div class="muted">
-                            Expected mode will not create receipt and will not add this amount to final donation totals.
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div id="event_fields" class="stack compact collect-conditional-v5<?= (string)tx_old('category', '') === 'event' ? '' : ' hidden' ?>">
@@ -901,27 +892,39 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <div id="source_fields" class="stack compact collect-conditional-v5<?= tx_old('collected_for_others', '') ? '' : ' hidden' ?>">
-                <div class="collect-date-notes-grid-v5">
-                    <div>
-                        <label>Contributor Count</label>
-                        <input type="number" min="2" name="contributor_count" value="<?= e((string)tx_old('contributor_count', '')) ?>" placeholder="e.g. 20">
-                    </div>
-                    <div>
-                        <label>Source Note</label>
-                        <input type="text" name="source_note" value="<?= e((string)tx_old('source_note', '')) ?>" placeholder="e.g. Collected by this person from a group">
-                    </div>
-                </div>
-            </div>
-
             <div class="collect-date-notes-grid-v5">
                 <div>
-                    <label>Date</label>
-                    <input type="date" name="transaction_date" value="<?= e((string)tx_old('transaction_date', date('Y-m-d'))) ?>">
+                    <label id="transaction_date_label">Date</label>
+                    <input type="date" name="transaction_date" id="transaction_date" value="<?= e((string)tx_old('transaction_date', date('Y-m-d'))) ?>">
                 </div>
                 <div>
                     <label>Notes</label>
                     <input type="text" name="notes" value="<?= e((string)tx_old('notes', '')) ?>" placeholder="Optional note">
+                </div>
+            </div>
+
+            <div class="collect-toggle-card-v5 collect-toggle-card-end-v5">
+                <label class="collect-toggle-row-v5" for="collected_for_others">
+                    <span class="collect-toggle-switch-v5">
+                        <input type="checkbox" name="collected_for_others" id="collected_for_others" value="1" <?= tx_old('collected_for_others', '') ? 'checked' : '' ?>>
+                        <span class="collect-toggle-slider-v5"></span>
+                    </span>
+                    <span class="collect-toggle-content-v5">
+                        <span class="collect-toggle-title-v5">Collected from Others</span>
+                        <span class="collect-toggle-help-v5">Turn on if this donor collected the amount from other contributors and is submitting it together.</span>
+                    </span>
+                </label>
+                <div id="source_fields" class="stack compact collect-conditional-v5 collect-toggle-fields-v5<?= tx_old('collected_for_others', '') ? '' : ' hidden' ?>">
+                    <div class="collect-date-notes-grid-v5">
+                        <div>
+                            <label>Contributor Count</label>
+                            <input type="number" min="2" name="contributor_count" value="<?= e((string)tx_old('contributor_count', '')) ?>" placeholder="e.g. 20">
+                        </div>
+                        <div>
+                            <label>Source Note</label>
+                            <input type="text" name="source_note" value="<?= e((string)tx_old('source_note', '')) ?>" placeholder="e.g. Collected by this person from a group">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -954,6 +957,8 @@ require_once __DIR__ . '/includes/header.php';
     const expectedFields = document.getElementById('expected_fields');
     const paymentSection = document.getElementById('payment_section');
     const dueDateInput = document.getElementById('due_date');
+    const txDateLabel = document.getElementById('transaction_date_label');
+    const txDateInput = document.getElementById('transaction_date');
 
     const saveButton = document.getElementById('collect_submit_btn');
     const expectedCommitmentId = <?= (int)$expectedCommitmentId ?>;
@@ -1036,6 +1041,12 @@ require_once __DIR__ . '/includes/header.php';
         }
         if (dueDateInput) {
             dueDateInput.required = isExpected;
+            if (isExpected && !dueDateInput.value && txDateInput && txDateInput.value) {
+                dueDateInput.value = txDateInput.value;
+            }
+        }
+        if (txDateLabel) {
+            txDateLabel.textContent = isExpected ? 'Record Date' : 'Date';
         }
         if (saveButton) {
             if (isExpected) {
