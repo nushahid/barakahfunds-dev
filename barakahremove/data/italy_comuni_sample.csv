@@ -1,0 +1,11 @@
+istat_code,comune_name,province_code,province_name,region_code,region_name,cadastral_code,cap,is_active
+001272,Torino,TO,Torino,01,Piemonte,L219,10121,1
+015146,Milano,MI,Milano,03,Lombardia,F205,20121,1
+058091,Roma,RM,Roma,12,Lazio,H501,00118,1
+021008,Bolzano/Bozen,BZ,Bolzano/Bozen,04,Trentino-Alto Adige/Südtirol,A952,39100,1
+037006,Bologna,BO,Bologna,08,Emilia-Romagna,A944,40121,1
+048017,Firenze,FI,Firenze,09,Toscana,D612,50121,1
+072006,Bari,BA,Bari,16,Puglia,A662,70121,1
+087015,Catania,CT,Catania,19,Sicilia,C351,95121,1
+027042,Venezia,VE,Venezia,05,Veneto,L736,30121,1
+063049,Napoli,NA,Napoli,15,Campania,F839,80121,1
