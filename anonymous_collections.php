@@ -316,6 +316,17 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
+            <div class="atx-filter-box">
+                    <label for="collection_date">Collection Date </label>
+                    <input type="date" 
+                           name="collection_date" 
+                           id="collection_date" 
+                           value="<?= date('Y-m-d') ?>" 
+                           required 
+                           style="width: 100%; padding: 12px; border: 1px solid #fed7aa; border-radius: 14px; font-family: inherit;">
+                    <small style="color: #64748b; font-size: 11px;">Format will display as per your device settings (e.g., DD-MM-YYYY)</small>
+                </div>
+
             <div>
                 <label class="field-label" for="notes">Notes</label>
                 <textarea name="notes" id="notes" rows="4" placeholder="Optional notes"><?= e($notesValue) ?></textarea>

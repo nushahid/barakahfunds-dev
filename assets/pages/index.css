@@ -38,6 +38,19 @@ body.page-index .toolbar{
     gap:12px;
     flex-wrap:wrap;
 }
+body.page-index .grid-2,
+body.page-index .grid-3,
+body.page-index .ledger-grid,
+body.page-index .stack,
+body.page-index .card,
+body.page-index .chart-shell,
+body.page-index .chart-bar-wrap,
+body.page-index .dashboard-method-row,
+body.page-index .dashboard-method-label,
+body.page-index .dashboard-method-value {
+    min-width: 0;
+}
+
 
 body.page-index .dashboard-cards{
     display:grid;
@@ -222,7 +235,8 @@ body.page-index .dashboard-method-row{
     gap:12px;
 }
 
-body.page-index .dashboard-method-label strong{
+body.page-index .dashboard-method-label {
+        font-size:13px;
     display:block;
     overflow-wrap:anywhere;
 }
