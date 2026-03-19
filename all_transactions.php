@@ -612,10 +612,18 @@ require_once __DIR__ . '/includes/header.php';
                                 <a class="btn btn-small" target="_blank" href="receipt_print.php?id=<?= (int)$row['ID'] ?>">Receipt</a>
                             </td>
                             <td>
-                                <form method="post" action="transaction_delete_direct.php" onsubmit="return confirm('Are you sure you want to delete this transaction?');">
-                                    <input type="hidden" name="ledger_id" value="<?= (int)$row['ID'] ?>">
-                                    <button type="submit" class="btn danger btn-small">Delete</button>
-                                </form>
+                                <form method="post" action="transaction_delete_request.php" onsubmit="return confirm('Are you sure you want to request deletion?');">
+        <input type="hidden" name="ledger_id" value="<?= (int)$row['ID'] ?>">
+        <div style="display:flex; flex-direction:column; gap:5px;">
+            <textarea 
+                name="reason" 
+                placeholder="Reason for removal..." 
+                required 
+                style="font-size:11px; width:120px; border:1px solid #fed7aa; border-radius:4px; padding:4px;"
+            ></textarea>
+            <button type="submit" class="btn danger btn-small">Request Delete</button>
+        </div>
+    </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>

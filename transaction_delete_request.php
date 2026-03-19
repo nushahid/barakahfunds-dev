@@ -2,7 +2,7 @@
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
-requireRole($pdo, 'operator');
+requireRole($pdo, 'operator','accountant','admin');
 
 $uid = getLoggedInUserId();
 
