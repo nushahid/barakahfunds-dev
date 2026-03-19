@@ -7,6 +7,8 @@ $uid = getLoggedInUserId();
 $id = max(0, (int)($_GET['id'] ?? $_POST['id'] ?? 0));
 $editing = $id > 0;
 $errors = [];
+$nameLocked = false;
+$originalPersonName = '';
 
 $societies = getSocieties($pdo);
 $defaultSocietyId = 0;
@@ -34,6 +36,28 @@ function ensureMonthlyPlanBankMode(PDO $pdo): void {
     }
 }
 ensureMonthlyPlanBankMode($pdo);
+
+function personHasTransactions(PDO $pdo, int $personId): bool
+{
+    if ($personId <= 0 || !tableExists($pdo, 'operator_ledger')) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 1
+            FROM operator_ledger
+            WHERE person_id = ?
+              AND is_removed = 0
+              AND amount >= 0
+            LIMIT 1
+        ");
+        $stmt->execute([$personId]);
+        return (bool)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
 
 $form = [
     'name' => '',
@@ -71,6 +95,8 @@ if ($editing) {
         exit;
     }
 
+    $originalPersonName = (string)($person['name'] ?? '');
+
     foreach ($form as $k => $v) {
         if (isset($person[$k])) {
             $form[$k] = $person[$k];
@@ -84,6 +110,8 @@ if ($editing) {
         $form['payment_mode'] = $plan['payment_mode'];
         $form['monthly_start_date'] = $plan['start_date'];
     }
+
+    $nameLocked = personHasTransactions($pdo, $id);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -106,6 +134,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!isset($_POST['organ_donor_status'])) {
         $form['organ_donor_status'] = $existingOrganDonorStatus !== '' ? $existingOrganDonorStatus : 'unknown';
+    }
+
+    if ($editing) {
+        $stmt = $pdo->prepare('SELECT name FROM people WHERE ID = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        $originalPersonName = (string)($row['name'] ?? '');
+        $nameLocked = personHasTransactions($pdo, $id);
+
+        if ($nameLocked) {
+            $form['name'] = $originalPersonName;
+        }
     }
 
     $allowedPaymentModes = ['cash_manual', 'bank_manual', 'stripe_auto'];
@@ -280,7 +320,18 @@ require_once __DIR__ . '/includes/header.php';
         <div class="inline-grid-2 donor-main-grid-v5">
             <div>
                 <label>Name</label>
-                <input type="text" name="name" value="<?= e((string)$form['name']) ?>" required>
+                <input
+                    type="text"
+                    name="name"
+                    value="<?= e((string)$form['name']) ?>"
+                    <?= $nameLocked ? 'readonly' : '' ?>
+                    required
+                >
+                <?php if ($nameLocked): ?>
+                    <div class="muted" style="margin-top:6px;">
+                        Name cannot be changed because visible donor transactions exist.
+                    </div>
+                <?php endif; ?>
             </div>
             <div>
                 <label>Phone</label>

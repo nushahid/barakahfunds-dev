@@ -166,6 +166,7 @@ if (tableExists($pdo, 'operator_ledger')) {
             FROM operator_ledger
             WHERE person_id = ?
               AND amount >= 0
+              AND is_removed = 0
             ORDER BY ID DESC
             LIMIT 100
         ');
@@ -184,6 +185,7 @@ if (tableExists($pdo, 'operator_ledger')) {
             FROM operator_ledger
             WHERE person_id = ?
               AND amount >= 0
+              AND is_removed = 0
             ORDER BY ID DESC
             LIMIT 100
         ');
@@ -462,20 +464,18 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="helper">If the QR does not scan on some phones, use the public link below. Anyone can open the page and verify with the last 3 digits of the donor phone number.</div>
                 <div class="helper person-side-note-v5">Sponsored expense values linked to this donor are reference-only records for reports. They do not mean this donor directly paid cash for the expense.</div>
                 <div class="public-link-box-v5">
-                                         
-                        <span class="public-link-text" 
-                            onclick="copyPublicLink(this)" 
-                            data-link="<?= e($publicUrl) ?>">
-                            <?= e($publicUrl) ?>
-                        </span>
+                    <span class="public-link-text" 
+                        onclick="copyPublicLink(this)" 
+                        data-link="<?= e($publicUrl) ?>">
+                        <?= e($publicUrl) ?>
+                    </span>
 
-                        <a class="btn-open-report" 
-                        href="<?= e($publicUrl) ?>" 
-                        target="_blank" 
-                        rel="noopener">
-                        Open
-                        </a>
-
+                    <a class="btn-open-report" 
+                    href="<?= e($publicUrl) ?>" 
+                    target="_blank" 
+                    rel="noopener">
+                    Open
+                    </a>
                 </div>
             </div>
 
@@ -551,13 +551,6 @@ require_once __DIR__ . '/includes/header.php';
                                 <?php if ($canAct): ?>
                                     <a class="btn btn-primary" href="<?= e($collectUrl) ?>">Collect Now</a>
                                     <a class="btn" href="<?= e($editUrl) ?>">Edit</a>
-
-                                    <!-- <form method="post" style="display:inline;">
-                                        <?= csrfField() ?>
-                                        <input type="hidden" name="commitment_action" value="mark_paid">
-                                        <input type="hidden" name="commitment_id" value="<?= (int)$row['ID'] ?>">
-                                        <button type="submit" class="btn">Mark Paid</button>
-                                    </form> -->
 
                                     <form method="post" style="display:inline;" onsubmit="return confirm('Cancel this expected record?');">
                                         <?= csrfField() ?>
@@ -645,7 +638,6 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </div>
 </div>
-
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
