@@ -685,10 +685,13 @@ function getAccountantBankBalance(PDO $pdo): float
         return 0.0;
     }
 
-    return queryValue($pdo, "SELECT COALESCE(SUM(CASE
-        WHEN entry_type = 'bank_deposit' THEN amount
-        WHEN payment_method IN ('bank_transfer','online','pos') THEN amount
-        ELSE 0 END),0) FROM accountant_ledger");
+    // FIXED: Added AND COALESCE(is_removed, 0) = 0
+    return (float) queryValue($pdo, "SELECT COALESCE(SUM(CASE 
+        WHEN entry_type = 'bank_deposit' THEN amount 
+        WHEN payment_method IN ('bank_transfer','online','pos') THEN amount 
+        ELSE 0 END), 0) 
+        FROM accountant_ledger 
+        WHERE COALESCE(is_removed, 0) = 0");
 }
 
 function getAccountantCashOnHand(PDO $pdo): float
@@ -700,7 +703,8 @@ function getAccountantCashOnHand(PDO $pdo): float
     return queryValue($pdo, "SELECT COALESCE(SUM(CASE
         WHEN entry_type = 'bank_deposit' THEN -amount
         WHEN payment_method = 'cash' THEN amount
-        ELSE 0 END),0) FROM accountant_ledger");
+        ELSE 0 END),0) FROM accountant_ledger
+        WHERE COALESCE(is_removed, 0) = 0");
 }
 
 
@@ -970,7 +974,8 @@ function getTotalCashInAllOperators(PDO $pdo): float
         return 0.0;
     }
 
-    return (float) queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger');
+    // ADDED: AND COALESCE(is_removed, 0) = 0
+    return (float) queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE COALESCE(is_removed, 0) = 0');
 }
 
 function allOperatorsCashInHand(PDO $pdo): float
@@ -978,13 +983,16 @@ function allOperatorsCashInHand(PDO $pdo): float
     return getTotalCashInAllOperators($pdo);
 }
 
-function getTotalCollectionTillNow(PDO $pdo): float
-{
-    if (!tableExists($pdo, 'operator_ledger')) {
-        return 0.0;
-    }
-
-    return queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0');
+function getTotalCollectionTillNow($pdo) {
+    // This fix ensures that deleted/removed transactions are NOT counted in the total
+    $sql = "SELECT SUM(amount) 
+            FROM operator_ledger 
+            WHERE (transaction_type = 'collection' OR transaction_type = 'credit')
+            AND COALESCE(is_removed, 0) = 0"; // <--- Add this line
+            
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
+    return $stmt->fetchColumn() ?: 0;
 }
 
 function getTotalExpenseTillNow(PDO $pdo): float
@@ -993,7 +1001,14 @@ function getTotalExpenseTillNow(PDO $pdo): float
         return 0.0;
     }
 
-    return abs(queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount < 0 AND transaction_category IN ("expense","transfer_out","loan_returned")'));
+    // FIXED: Added AND COALESCE(is_removed, 0) = 0
+    return abs((float) queryValue($pdo, 
+        'SELECT COALESCE(SUM(amount), 0) 
+         FROM operator_ledger 
+         WHERE amount < 0 
+           AND transaction_category IN ("expense", "transfer_out", "loan_returned") 
+           AND COALESCE(is_removed, 0) = 0'
+    ));
 }
 
 function getMonthlyAgreed(PDO $pdo): float
@@ -1007,7 +1022,16 @@ function getMonthlyAgreed(PDO $pdo): float
 function getMonthlyCollected(PDO $pdo): float
 {
     if (tableExists($pdo, 'operator_ledger')) {
-        return queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0 AND transaction_category = "monthly" AND created_at >= ? AND created_at < ?', [currentMonthStart(), nextMonthStart()]);
+        return (float)queryValue($pdo, 
+            'SELECT COALESCE(SUM(amount), 0) 
+             FROM operator_ledger 
+             WHERE amount > 0 
+               AND transaction_category = "monthly" 
+               AND created_at >= ? 
+               AND created_at < ? 
+               AND COALESCE(is_removed, 0) = 0', 
+            [currentMonthStart(), nextMonthStart()]
+        );
     }
     return 0.0;
 }
@@ -1015,19 +1039,35 @@ function getMonthlyCollected(PDO $pdo): float
 function getMonthlyTotalCollected(PDO $pdo): float
 {
     if (tableExists($pdo, 'operator_ledger')) {
-        return queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0 AND created_at >= ? AND created_at < ?', [currentMonthStart(), nextMonthStart()]);
+        return (float) queryValue($pdo, 
+            'SELECT COALESCE(SUM(amount), 0) 
+             FROM operator_ledger 
+             WHERE amount > 0 
+               AND created_at >= ? 
+               AND created_at < ? 
+               AND COALESCE(is_removed, 0) = 0', // <--- ADDED THIS LINE
+            [currentMonthStart(), nextMonthStart()]
+        );
     }
     return 0.0;
 }
-
 function getMonthlyExpense(PDO $pdo): float
 {
     if (tableExists($pdo, 'operator_ledger')) {
-        return abs(queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount < 0 AND transaction_category IN ("expense","transfer_out","loan_returned") AND created_at >= ? AND created_at < ?', [currentMonthStart(), nextMonthStart()]));
+        // FIXED: Added AND COALESCE(is_removed, 0) = 0
+        return abs((float) queryValue($pdo, 
+            'SELECT COALESCE(SUM(amount), 0) 
+             FROM operator_ledger 
+             WHERE amount < 0 
+               AND transaction_category IN ("expense", "transfer_out", "loan_returned") 
+               AND created_at >= ? 
+               AND created_at < ? 
+               AND COALESCE(is_removed, 0) = 0', 
+            [currentMonthStart(), nextMonthStart()]
+        ));
     }
     return 0.0;
 }
-
 function getAccountantCashInHand(PDO $pdo): float
 {
     return getAccountantCashOnHand($pdo);
@@ -1061,13 +1101,15 @@ function getCollectionByMethod(PDO $pdo, string $start, string $end): array
     }
 
     try {
+        // FIXED: Added AND COALESCE(is_removed, 0) = 0
         $stmt = $pdo->prepare("
-            SELECT payment_method, COALESCE(SUM(amount), 0) AS total
-            FROM operator_ledger
-            WHERE amount > 0
-              AND created_at >= ?
-              AND created_at < ?
-              AND payment_method IN ('cash', 'bank', 'pos', 'stripe', 'online')
+            SELECT payment_method, COALESCE(SUM(amount), 0) AS total 
+            FROM operator_ledger 
+            WHERE amount > 0 
+              AND created_at >= ? 
+              AND created_at < ? 
+              AND payment_method IN ('cash', 'bank', 'pos', 'stripe', 'online') 
+              AND COALESCE(is_removed, 0) = 0 
             GROUP BY payment_method
         ");
         $stmt->execute([$start, $end]);
@@ -1079,11 +1121,11 @@ function getCollectionByMethod(PDO $pdo, string $start, string $end): array
             }
         }
     } catch (Throwable $e) {
+        // Silence or log error
     }
 
     return $methods;
 }
-
 
 
 function getDailyCollectionSeries(PDO $pdo): array
@@ -1096,12 +1138,22 @@ function getDailyCollectionSeries(PDO $pdo): array
     }
     if (tableExists($pdo, 'operator_ledger')) {
         try {
-            $stmt = $pdo->prepare('SELECT DATE(created_at) AS d, COALESCE(SUM(amount),0) AS total FROM operator_ledger WHERE amount > 0 AND created_at >= ? AND created_at < ? GROUP BY DATE(created_at)');
+            // ADDED: AND COALESCE(is_removed, 0) = 0
+            $stmt = $pdo->prepare('SELECT DATE(created_at) AS d, COALESCE(SUM(amount),0) AS total 
+                                   FROM operator_ledger 
+                                   WHERE amount > 0 
+                                   AND created_at >= ? 
+                                   AND created_at < ? 
+                                   AND COALESCE(is_removed, 0) = 0 
+                                   GROUP BY DATE(created_at)');
             $stmt->execute([currentMonthStart(), nextMonthStart()]);
             foreach ($stmt->fetchAll() as $row) {
-                $series[$row['d']] = (float)$row['total'];
+                if (isset($series[$row['d']])) {
+                    $series[$row['d']] = (float)$row['total'];
+                }
             }
         } catch (Throwable $e) {
+            // Log error if needed
         }
     }
     return $series;
@@ -1145,25 +1197,50 @@ function monthlyOutstandingMonths(PDO $pdo, int $personId): array
 {
     $plan = getPersonCurrentPlan($pdo, $personId);
     if (!$plan || (float)$plan['amount'] <= 0) return [];
+    
     $start = date('Y-m-01', strtotime((string)$plan['start_date'] ?: date('Y-m-01')));
     $months = [];
     $cursor = strtotime($start);
     $paid = 0.0;
+
     if (tableExists($pdo, 'operator_ledger')) {
-        $paid = queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE person_id = ? AND transaction_category = "monthly"', [$personId]);
+        // FIXED: Added AND COALESCE(is_removed, 0) = 0
+        $paid = (float) queryValue($pdo, 
+            'SELECT COALESCE(SUM(amount), 0) 
+             FROM operator_ledger 
+             WHERE person_id = ? 
+               AND transaction_category = "monthly" 
+               AND COALESCE(is_removed, 0) = 0', 
+            [$personId]
+        );
     }
+
     $amount = (float)$plan['amount'];
+    // $credits represents how many months the total valid payments cover
     $credits = (int)floor($paid / $amount);
+    
     for ($i = 0; $i < 24; $i++) {
         $months[] = date('Y-m', strtotime('+' . $i . ' month', $cursor));
     }
+    
+    // Returns only the months that are not yet covered by valid payments
     return array_slice($months, $credits);
 }
 
 function operatorBalance(PDO $pdo, int $userId): float
 {
-    if (!tableExists($pdo, 'operator_ledger')) return 0.0;
-    return queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE operator_id = ?', [$userId]);
+    if (!tableExists($pdo, 'operator_ledger')) {
+        return 0.0;
+    }
+
+    // FIXED: Only sum transactions that haven't been removed
+    return (float) queryValue($pdo, 
+        'SELECT COALESCE(SUM(amount), 0) 
+         FROM operator_ledger 
+         WHERE operator_id = ? 
+           AND COALESCE(is_removed, 0) = 0', 
+        [$userId]
+    );
 }
 
 function operatorPendingTransfers(PDO $pdo, int $userId): float
@@ -1175,25 +1252,43 @@ function operatorPendingTransfers(PDO $pdo, int $userId): float
 function activeEventsSummary(PDO $pdo): array
 {
     if (!tableExists($pdo, 'events')) return [];
+
     $estimateCol = columnExists($pdo, 'events', 'estimate') ? 'estimate' : (columnExists($pdo, 'events', 'estimated') ? 'estimated' : '0');
     $nameCol = columnExists($pdo, 'events', 'name') ? 'name' : (columnExists($pdo, 'events', 'event_name') ? 'event_name' : 'name');
     $statusCol = columnExists($pdo, 'events', 'status') ? 'status' : '1';
-    $eventDetailsExists = tableExists($pdo, 'event_details');
-    $eventIdCol = $eventDetailsExists && columnExists($pdo, 'event_details', 'event_id') ? 'event_id' : ($eventDetailsExists && columnExists($pdo, 'event_details', 'eid') ? 'eid' : '');
-    $collectedSql = ($eventDetailsExists && $eventIdCol !== '') ? 'COALESCE((SELECT SUM(amount) FROM event_details d WHERE d.' . $eventIdCol . ' = e.ID),0)' : '0';
-    $sql = 'SELECT e.ID, e.' . $nameCol . ' AS name, e.' . $estimateCol . ' AS estimate, e.' . $statusCol . ' AS status, ' . $collectedSql . ' AS collected FROM events e';
-    if ($statusCol !== '1') {
-        $sql .= ' WHERE e.' . $statusCol . ' = 1';
+    
+    // We update the calculation for 'collected' to pull from operator_ledger 
+    // and exclude removed items.
+    if (tableExists($pdo, 'operator_ledger')) {
+        $collectedSql = 'COALESCE((
+            SELECT SUM(amount) 
+            FROM operator_ledger ol 
+            WHERE ol.reference_id = e.ID 
+              AND LOWER(ol.transaction_category) = "event" 
+              AND COALESCE(ol.is_removed, 0) = 0
+        ), 0)';
+    } else {
+        $collectedSql = '0';
     }
+
+    $sql = "SELECT e.ID, e.$nameCol AS name, e.$estimateCol AS estimate, e.$statusCol AS status, $collectedSql AS collected FROM events e";
+    
+    if ($statusCol !== '1') {
+        $sql .= " WHERE e.$statusCol = 1";
+    }
+    
     $sql .= ' ORDER BY e.ID DESC LIMIT 10';
+
     try {
         $rows = $pdo->query($sql)->fetchAll();
     } catch (Throwable $e) {
         return [];
     }
+
     foreach ($rows as &$row) {
         $row['remaining'] = (float)$row['estimate'] - (float)$row['collected'];
     }
+    
     return $rows;
 }
 

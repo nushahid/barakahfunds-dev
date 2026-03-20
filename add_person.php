@@ -111,8 +111,7 @@ if ($editing) {
         $form['monthly_start_date'] = $plan['start_date'];
     }
 
-    $nameLocked = personHasTransactions($pdo, $id);
-}
+$nameLocked = personHasTransactions($pdo, $id) && !isAccountant();}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfOrFail();

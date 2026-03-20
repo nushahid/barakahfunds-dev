@@ -2,7 +2,6 @@
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
-requireRole($pdo, 'operator');
 
 $search = trim((string)($_GET['q'] ?? ''));
 $filter = trim((string)($_GET['filter'] ?? 'all'));
