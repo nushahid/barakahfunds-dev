@@ -69,16 +69,21 @@ body.page-index .dashboard-card{
     overflow:hidden;
 }
 
-/* --- Individual Rainbow Colors for Cards --- */
-body.page-index .dashboard-card:nth-child(8n+1) { background: linear-gradient(135deg, #ef4444, #f87171); } /* Red */
-body.page-index .dashboard-card:nth-child(8n+2) { background: linear-gradient(135deg, #f97316, #fb923c); } /* Orange */
-body.page-index .dashboard-card:nth-child(8n+3) { background: linear-gradient(135deg, #f59e0b, #fbbf24); } /* Amber */
-body.page-index .dashboard-card:nth-child(8n+4) { background: linear-gradient(135deg, #10b981, #34d399); } /* Emerald */
-body.page-index .dashboard-card:nth-child(8n+5) { background: linear-gradient(135deg, #06b6d4, #22d3ee); } /* Cyan */
-body.page-index .dashboard-card:nth-child(8n+6) { background: linear-gradient(135deg, #3b82f6, #60a5fa); } /* Blue */
-body.page-index .dashboard-card:nth-child(8n+7) { background: linear-gradient(135deg, #8b5cf6, #a78bfa); } /* Violet */
-body.page-index .dashboard-card:nth-child(8n+8) { background: linear-gradient(135deg, #d946ef, #f0abfc); } /* Fuchsia */
-/* ------------------------------------------- */
+body.page-index .dashboard-card.group-monthly{
+    background:linear-gradient(135deg,#2563eb,#4f46e5);
+}
+
+body.page-index .dashboard-card.group-cash{
+    background:linear-gradient(135deg,#0f766e,#14b8a6);
+}
+
+body.page-index .dashboard-card.group-activity{
+    background:linear-gradient(135deg,#7c3aed,#a855f7);
+}
+
+body.page-index .dashboard-card.group-alert{
+    background:linear-gradient(135deg,#ea580c,#ef4444);
+}
 
 body.page-index .dashboard-card-top{
     display:flex;

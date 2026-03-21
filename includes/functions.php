@@ -1302,3 +1302,62 @@ function getPublicDonorByPhone(PDO $pdo, int $id, string $last3): ?array
     if (substr($digits, -3) !== preg_replace('/\D+/', '', $last3)) return null;
     return $person;
 }
+
+
+/**
+ * Fetches total donations for a list of person IDs, excluding removed records.
+ */
+function getMultiplePersonTotals(PDO $pdo, array $personIds): array 
+{
+    if (empty($personIds) || !tableExists($pdo, 'operator_ledger')) {
+        return [];
+    }
+    
+    $placeholders = implode(',', array_fill(0, count($personIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT person_id, SUM(amount) AS total 
+        FROM operator_ledger 
+        WHERE person_id IN ($placeholders) 
+          AND amount >= 0 
+          AND COALESCE(is_removed, 0) = 0 
+        GROUP BY person_id
+    ");
+    $stmt->execute($personIds);
+    
+    $results = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $results[(int)$row['person_id']] = (float)$row['total'];
+    }
+    return $results;
+}
+
+/**
+ * Fetches total sponsored (expense) amounts for a list of person IDs.
+ */
+function getMultiplePersonSponsoredTotals(PDO $pdo, array $personIds): array 
+{
+    if (empty($personIds) || !tableExists($pdo, 'expense')) {
+        return [];
+    }
+
+    // Check if the 'donation' column exists to avoid SQL errors
+    if (function_exists('columnExists') && !columnExists($pdo, 'expense', 'donation')) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($personIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT pid AS person_id, SUM(amount) AS total 
+        FROM expense 
+        WHERE pid IN ($placeholders) 
+          AND donation = 1 
+        GROUP BY pid
+    ");
+    $stmt->execute($personIds);
+    
+    $results = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $results[(int)$row['person_id']] = (float)$row['total'];
+    }
+    return $results;
+}

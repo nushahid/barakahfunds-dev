@@ -80,7 +80,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('success', 'Transfer request sent.');
             header('Location: transfer_requests.php');
             exit;
+        } elseif ($action === 'bank_deposit' && $role === 'accountant') {
+        $amount = (float)($_POST['amount'] ?? 0);
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        $cashOnHandNow = getAccountantCashOnHand($pdo);
+
+        if ($amount > 0 && $amount <= $cashOnHandNow) {
+            $pdo->prepare('INSERT INTO accountant_ledger (entry_type, amount, payment_method, notes, created_by, created_at) VALUES ("bank_deposit", ?, "bank_transfer", ?, ?, NOW())')
+                ->execute([$amount, $notes !== '' ? $notes : 'Cash moved to bank', $uid]);
+            
+            systemLog($pdo, $uid, 'accountant', 'bank_deposit', 'Bank deposit ' . number_format($amount, 2));
+            setFlash('success', 'Cash moved to bank successfully.');
+            header('Location: transfer_requests.php');
+            exit;
+        } else {
+            $errors[] = 'Deposit amount must be positive and cannot exceed your cash in hand (' . money($cashOnHandNow) . ').';
         }
+    }
     }
 
     if (in_array($action, ['accept', 'refuse'], true)) {
@@ -215,8 +231,25 @@ $sentStmt = $pdo->prepare('
 $sentStmt->execute([$uid]);
 $sent = $sentStmt->fetchAll();
 
-$myBalance = operatorBalance($pdo, $uid);
+// $myBalance = operatorBalance($pdo, $uid);
+// $pendingAmount = operatorPendingTransfers($pdo, $uid);
+
+// // Add this line to get the accountant's current cash for the form validation
+// $cashOnHand = ($role === 'accountant') ? getAccountantCashOnHand($pdo) : 0.0;
+
+// If accountant, show Cash on Hand as the primary balance
+// If operator, show their standard operator balance
+if ($role === 'accountant') {
+    $cashOnHand = getAccountantCashOnHand($pdo);
+    $myBalance = $cashOnHand; 
+} else {
+    $myBalance = operatorBalance($pdo, $uid);
+    $cashOnHand = 0.0;
+}
+
 $pendingAmount = operatorPendingTransfers($pdo, $uid);
+
+
 
 $acceptedLogStmt = $pdo->prepare('
     SELECT tl.*,
@@ -452,5 +485,35 @@ require_once __DIR__ . '/includes/header.php';
         </table>
     </div>
 </div>
+<?php if ($role === 'accountant'): ?>
+<div class="card" style="margin-top:24px; border-top: 4px solid var(--primary);">
+    <div class="transfer-section-head-v6">
+        <h2 style="margin-top:0">🏦 Move Cash to Bank</h2>
+        <div class="helper">
+            Use this when you (the accountant) deposit physical mosque cash into the bank account. 
+            <strong>Your Cash on Hand: <?= money($cashOnHand) ?></strong>
+        </div>
+    </div>
 
+    <form method="post" class="stack compact">
+        <?= csrfField() ?>
+        <input type="hidden" name="action" value="bank_deposit">
+        
+        <div class="grid-2">
+            <div class="transfer-field-v6">
+                <label>Amount to Deposit</label>
+                <input type="number" step="0.01" min="0.01" max="<?= e((string)$cashOnHand) ?>" name="amount" required placeholder="0.00">
+            </div>
+            <div class="transfer-field-v6">
+                <label>Deposit Notes / Reference</label>
+                <input type="text" name="notes" placeholder="e.g. ATM Deposit Branch X">
+            </div>
+        </div>
+        
+        <div style="margin-top:10px;">
+            <button class="btn btn-primary" type="submit" style="width:auto; padding: 10px 24px;">Confirm Bank Deposit</button>
+        </div>
+    </form>
+</div>
+<?php endif; ?>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

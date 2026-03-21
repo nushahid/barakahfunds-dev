@@ -2,7 +2,7 @@
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
-//requireRole($pdo, 'operator','accountant');
+requireRole($pdo, 'operator','accountant','admin');
 
 $id = max(0, (int)($_GET['id'] ?? 0));
 if ($id <= 0) {

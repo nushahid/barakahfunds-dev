@@ -111,7 +111,10 @@ if ($editing) {
         $form['monthly_start_date'] = $plan['start_date'];
     }
 
-$nameLocked = personHasTransactions($pdo, $id) && !isAccountant();}
+$nameLocked = personHasTransactions($pdo, $id) && !isAccountant($pdo);
+} // <--- MAKE SURE THIS BRACKET EXISTS
+// --- END OF THE EDITING BLOCK ---
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfOrFail();
@@ -140,8 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         $originalPersonName = (string)($row['name'] ?? '');
-        $nameLocked = personHasTransactions($pdo, $id);
-
+// Lock the name ONLY if transactions exist AND the user is NOT an accountant/admin
+$nameLocked = personHasTransactions($pdo, $id) && !isAccountant($pdo);
         if ($nameLocked) {
             $form['name'] = $originalPersonName;
         }
@@ -155,11 +158,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($form['name'] === '') {
         $errors[] = 'Name is required.';
     }
-    if ($form['phone'] === '') {
-        $errors[] = 'Phone is required.';
-    }
+    // if ($form['phone'] === '') {
+    //     $errors[] = 'Phone is required.';
+    // }
     if ($form['monthly_subscription'] && (float)$form['monthly_amount'] <= 0) {
         $errors[] = 'Monthly amount must be greater than zero.';
+    }
+
+    // 2. Duplicate Check Logic
+    if (!$errors) {
+        // Logic: Match if phone is same OR (phone is empty AND name is same)
+        $dupSql = "SELECT ID, name FROM people WHERE (
+                    (phone != '' AND phone = ?) OR 
+                    (phone = '' AND ? = '' AND name = ?)
+                   )";
+        $dupParams = [$form['phone'], $form['phone'], $form['name']];
+
+        if ($editing) {
+            $dupSql .= " AND ID != ?";
+            $dupParams[] = $id;
+        }
+
+        $stmt = $pdo->prepare($dupSql);
+        $stmt->execute($dupParams);
+        $duplicate = $stmt->fetch();
+
+        if ($duplicate) {
+            $errors[] = ($form['phone'] !== '') 
+                ? "Duplicate found: Phone is already used by " . e($duplicate['name'])
+                : "Duplicate found: A donor named '" . e($form['name']) . "' with no phone already exists.";
+        }
     }
 
     if (!$errors) {
@@ -319,13 +347,18 @@ require_once __DIR__ . '/includes/header.php';
         <div class="inline-grid-2 donor-main-grid-v5">
             <div>
                 <label>Name</label>
-                <input
-                    type="text"
-                    name="name"
-                    value="<?= e((string)$form['name']) ?>"
-                    <?= $nameLocked ? 'readonly' : '' ?>
-                    required
-                >
+<input 
+    type="text" 
+    name="name" 
+    id="donor_name_input"
+    list="existing_names" 
+    value="<?= e((string)$form['name']) ?>" 
+    <?= $nameLocked ? 'readonly' : '' ?> 
+    required
+>
+<datalist id="existing_names">
+    </datalist>
+
                 <?php if ($nameLocked): ?>
                     <div class="muted" style="margin-top:6px;">
                         Name cannot be changed because visible donor transactions exist.
@@ -334,7 +367,7 @@ require_once __DIR__ . '/includes/header.php';
             </div>
             <div>
                 <label>Phone</label>
-                <input type="text" name="phone" value="<?= e((string)$form['phone']) ?>" required>
+                <input type="text" name="phone" value="<?= e((string)$form['phone']) ?>" >
             </div>
         </div>
 
@@ -608,5 +641,55 @@ document.addEventListener('click', function(e){
 </script>
 
 <script src="assets/city-autocomplete.js"></script>
+
+<script>
+    // Add this inside a <script> tag at the bottom of add_person.php
+const nameInput = document.querySelector('input[name="name"]');
+
+// Create a simple dropdown container dynamically or add it to your HTML
+let suggestionBox = document.createElement('div');
+suggestionBox.style.cssText = "position:absolute; background:white; border:1px solid #ccc; width:100%; z-index:1000; display:none;";
+nameInput.parentNode.style.position = "relative";
+nameInput.parentNode.appendChild(suggestionBox);
+
+nameInput.addEventListener('input', function() {
+    const val = this.value;
+    if (val.length < 2) {
+        suggestionBox.style.display = 'none';
+        return;
+    }
+
+    fetch(`ajax_search_donors.php?q=${encodeURIComponent(val)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.length === 0) {
+                suggestionBox.style.display = 'none';
+                return;
+            }
+
+            suggestionBox.innerHTML = '';
+            data.forEach(item => {
+                let div = document.createElement('div');
+                div.style.padding = '8px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid #eee';
+                div.innerHTML = `<strong>${item.name}</strong> <small>(${item.phone})</small>`;
+                
+                div.onclick = function() {
+                    nameInput.value = item.name;
+                    suggestionBox.style.display = 'none';
+                };
+                suggestionBox.appendChild(div);
+            });
+            suggestionBox.style.display = 'block';
+        });
+});
+
+// Hide suggestion box when clicking outside
+document.addEventListener('click', (e) => {
+    if (e.target !== nameInput) suggestionBox.style.display = 'none';
+});
+    </script>
+
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

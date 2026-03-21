@@ -42,13 +42,18 @@ function reportSum(PDO $pdo, string $sql, array $params = []): float
         return 0.0;
     }
 }
+// Keep it for operator_ledger (Collections & Expenses)
+$collections = reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0 AND created_at >= ? AND created_at < ? AND COALESCE(is_removed, 0) = 0', [$start, $end]);
+$expenses = abs(reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount < 0 AND transaction_category = "expense" AND created_at >= ? AND created_at < ? AND COALESCE(is_removed, 0) = 0', [$start, $end]));
 
-$collections = reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0 AND created_at >= ? AND created_at < ?', [$start, $end]);
-$expenses = abs(reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount < 0 AND transaction_category = "expense" AND created_at >= ? AND created_at < ?', [$start, $end]));
+// REMOVE it for accountant_ledger (Adjustments)
 $adjustments = reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM accountant_ledger WHERE entry_type = "adjustment" AND created_at >= ? AND created_at < ?', [$start, $end]);
 
-$collectionsBefore = reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0 AND created_at < ?', [$start]);
-$expensesBefore = abs(reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount < 0 AND transaction_category = "expense" AND created_at < ?', [$start]));
+// Opening Balance - operator_ledger (Keep it)
+$collectionsBefore = reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount > 0 AND created_at < ? AND COALESCE(is_removed, 0) = 0', [$start]);
+$expensesBefore = abs(reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE amount < 0 AND transaction_category = "expense" AND created_at < ? AND COALESCE(is_removed, 0) = 0', [$start]));
+
+// Opening Balance - accountant_ledger (Remove it)
 $adjustmentsBefore = reportSum($pdo, 'SELECT COALESCE(SUM(amount),0) FROM accountant_ledger WHERE entry_type = "adjustment" AND created_at < ?', [$start]);
 
 $openingBalance = $collectionsBefore - $expensesBefore + $adjustmentsBefore;
@@ -76,13 +81,18 @@ if (!isset($methods['online'])) {
     $methods['online'] = 0.0;
 }
 
-$rowsStmt = $pdo->prepare('SELECT created_at, invoice_no, transaction_category, payment_method, amount, notes FROM operator_ledger WHERE created_at >= ? AND created_at < ? ORDER BY ID DESC LIMIT 200');
+// Operator Ledger (Keep is_removed)
+$rowsStmt = $pdo->prepare('SELECT created_at, invoice_no, transaction_category, payment_method, amount, notes FROM operator_ledger WHERE created_at >= ? AND created_at < ? AND COALESCE(is_removed, 0) = 0 ORDER BY ID DESC LIMIT 200');
+
+
 $rowsStmt->execute([$start, $end]);
 $rows = $rowsStmt->fetchAll();
 
 $accRows = [];
 if (tableExists($pdo, 'accountant_ledger')) {
-    $accStmt = $pdo->prepare('SELECT created_at, entry_type, payment_method, amount, notes FROM accountant_ledger WHERE created_at >= ? AND created_at < ? ORDER BY ID DESC LIMIT 100');
+// Accountant Ledger (Remove is_removed)
+$accStmt = $pdo->prepare('SELECT created_at, entry_type, payment_method, amount, notes FROM accountant_ledger WHERE created_at >= ? AND created_at < ? ORDER BY ID DESC LIMIT 100');
+
     $accStmt->execute([$start, $end]);
     $accRows = $accStmt->fetchAll();
 }
@@ -170,7 +180,7 @@ require_once __DIR__ . '/includes/header.php';
     <?php endforeach; ?>
 </div>
 
-<?php if (currentRole($pdo) === 'accountant'): ?>
+<!-- <?php if (currentRole($pdo) === 'accountant'): ?>
 <div class="card" style="margin-top:18px;">
     <h2 style="margin-top:0">Move Cash to Bank</h2>
     <div class="helper">Use this when the accountant deposits mosque cash into the bank. This reduces accountant cash in hand and increases bank balance.</div>
@@ -190,7 +200,7 @@ require_once __DIR__ . '/includes/header.php';
         <button class="btn btn-primary" type="submit">Transfer Cash to Bank</button>
     </form>
 </div>
-<?php endif; ?>
+<?php endif; ?> -->
 
 <div class="card" style="margin-top:18px;">
     <div class="toolbar">

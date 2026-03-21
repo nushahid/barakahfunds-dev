@@ -2,6 +2,8 @@
 require_once __DIR__ . '/includes/functions.php';
 startSecureSession();
 require_once __DIR__ . '/includes/db.php';
+requireRole($pdo, 'operator','accountant','admin');
+
 
 $search = trim((string)($_GET['q'] ?? ''));
 $filter = trim((string)($_GET['filter'] ?? 'all'));
@@ -19,27 +21,16 @@ $personSponsoredTotals = [];
 
 $personIds = array_values(array_filter(array_map(static fn(array $row): int => (int)($row['ID'] ?? 0), $people)));
 
-if ($personIds) {
-    $placeholders = implode(',', array_fill(0, count($personIds), '?'));
+// Use our new clean functions from functions.php
+$personTotals = getMultiplePersonTotals($pdo, $personIds);
+$personSponsoredTotals = getMultiplePersonSponsoredTotals($pdo, $personIds);
 
-    if (tableExists($pdo, 'operator_ledger')) {
-        $stmt = $pdo->prepare("\n            SELECT person_id, SUM(amount) AS total_donations\n            FROM operator_ledger\n            WHERE person_id IN ($placeholders)\n              AND amount >= 0\n            GROUP BY person_id\n        ");
-        $stmt->execute($personIds);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $personTotals[(int)$row['person_id']] = (float)($row['total_donations'] ?? 0);
-        }
-    }
+$searchTotalDonations = 0;
+$searchTotalSponsored = 0;
 
-    if (tableExists($pdo, 'expense')) {
-        $hasDonationFlag = function_exists('columnExists') && columnExists($pdo, 'expense', 'donation');
-        if ($hasDonationFlag) {
-            $stmt = $pdo->prepare("\n                SELECT pid AS person_id, SUM(amount) AS sponsored_amount\n                FROM expense\n                WHERE pid IN ($placeholders)\n                  AND donation = 1\n                GROUP BY pid\n            ");
-            $stmt->execute($personIds);
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $personSponsoredTotals[(int)$row['person_id']] = (float)($row['sponsored_amount'] ?? 0);
-            }
-        }
-    }
+foreach ($personIds as $pid) {
+    $searchTotalDonations += ($personTotals[$pid] ?? 0);
+    $searchTotalSponsored += ($personSponsoredTotals[$pid] ?? 0);
 }
 
 require_once __DIR__ . '/includes/header.php';
@@ -91,15 +82,24 @@ require_once __DIR__ . '/includes/header.php';
   </div>
 </form>
 
-  <div class="donor-results-bar-v5">
-    <strong><?= (int)$resultCount ?></strong> result<?= $resultCount === 1 ? '' : 's' ?>
-    <?php if ($filter !== 'all'): ?>
-      <span class="muted">for <?= e(ucfirst($filter === 'death' ? 'death insurance' : $filter)) ?></span>
+<div class="donor-results-bar-v5" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+    <div>
+        <strong><?= (int)$resultCount ?></strong> donor<?= $resultCount === 1 ? '' : 's' ?>
+        <?php if ($filter !== 'all'): ?>
+            <span class="muted">in <?= e(ucfirst($filter)) ?></span>
+        <?php endif; ?>
+        <?php if ($search !== ''): ?>
+            <span class="muted">matching “<?= e($search) ?>”</span>
+        <?php endif; ?>
+    </div>
+
+    <?php if ($search !== '' || $filter !== 'all'): ?>
+        <div style="display: flex; gap: 20px;">
+            <span>Collected: <strong style="color: #27ae60;"><?= money($searchTotalDonations) ?></strong></span>
+            <span>Sponsored: <strong style="color: #2980b9;"><?= money($searchTotalSponsored) ?></strong></span>
+        </div>
     <?php endif; ?>
-    <?php if ($search !== ''): ?>
-      <span class="muted">matching “<?= e($search) ?>”</span>
-    <?php endif; ?>
-  </div>
+</div>
 
   <div class="donor-record-list">
     <?php foreach ($people as $person): ?>

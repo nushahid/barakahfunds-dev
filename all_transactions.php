@@ -612,7 +612,7 @@ require_once __DIR__ . '/includes/header.php';
                                 <a class="btn btn-small" target="_blank" href="receipt_print.php?id=<?= (int)$row['ID'] ?>">Receipt</a>
                             </td>
                             <td>
-                                <form method="post" action="transaction_delete_request.php" onsubmit="return confirm('Are you sure you want to request deletion?');">
+                                <form method="post" action="transaction_delete_direct.php" onsubmit="return confirm('Are you sure you want to request deletion?');">
         <input type="hidden" name="ledger_id" value="<?= (int)$row['ID'] ?>">
         <div style="display:flex; flex-direction:column; gap:5px;">
             <textarea 

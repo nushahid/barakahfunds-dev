@@ -15,6 +15,7 @@ $menu = [
 
     // 👥 Donor Management
     ['file' => 'donors.php', 'label' => 'Donors', 'icon' => '👥', 'roles' => ['operator']],
+    ['file' => 'donor_reports.php', 'label' => 'Donors Reports', 'icon' => '📊', 'roles' => ['operator']],
 
     // 💰 Fund Collection
     ['file' => 'transaction_page.php', 'label' => 'Donations', 'icon' => '💝', 'roles' => ['operator','accountant']],
