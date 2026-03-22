@@ -685,28 +685,100 @@ function getAccountantBankBalance(PDO $pdo): float
         return 0.0;
     }
 
-    // FIXED: Added AND COALESCE(is_removed, 0) = 0
-    return (float) queryValue($pdo, "SELECT COALESCE(SUM(CASE 
-        WHEN entry_type = 'bank_deposit' THEN amount 
-        WHEN payment_method IN ('bank_transfer','online','pos') THEN amount 
-        ELSE 0 END), 0) 
-        FROM accountant_ledger 
-        WHERE COALESCE(is_removed, 0) = 0");
-}
+    return (float) queryValue($pdo, "
+        SELECT COALESCE(SUM(
+            CASE
+                -- operator sent directly by bank to mosque/accountant side
+                WHEN transaction_category = 'operator_to_bank' AND payment_method = 'bank_transfer' THEN amount
 
+                -- cash deposited into bank; stored negative in ledger, but bank increases
+                WHEN transaction_category = 'bank_deposit' THEN ABS(amount)
+
+                -- direct non-cash bank-side entries
+                WHEN payment_method IN ('online', 'pos') THEN amount
+
+                ELSE 0
+            END
+        ), 0)
+        FROM accountant_ledger
+    ");
+}
+// function getAccountantBankBalance(PDO $pdo): float
+// {
+//     if (!tableExists($pdo, 'accountant_ledger')) {
+//         return 0.0;
+//     }
+
+//     // FIXED: Added AND COALESCE(is_removed, 0) = 0
+//     return (float) queryValue($pdo, "SELECT COALESCE(SUM(CASE 
+//         WHEN entry_type = 'bank_deposit' THEN amount 
+//         WHEN payment_method IN ('bank_transfer','online','pos') THEN amount 
+//         ELSE 0 END), 0) 
+//         FROM accountant_ledger 
+//         WHERE COALESCE(is_removed, 0) = 0");
+// }
+
+// 
 function getAccountantCashOnHand(PDO $pdo): float
 {
     if (!tableExists($pdo, 'accountant_ledger')) {
         return 0.0;
     }
 
-    return queryValue($pdo, "SELECT COALESCE(SUM(CASE
-        WHEN entry_type = 'bank_deposit' THEN -amount
-        WHEN payment_method = 'cash' THEN amount
-        ELSE 0 END),0) FROM accountant_ledger
-        WHERE COALESCE(is_removed, 0) = 0");
+    return (float) queryValue($pdo, "
+        SELECT COALESCE(SUM(
+            CASE
+                -- operator gave physical cash to accountant
+                WHEN transaction_category = 'operator_to_bank' AND payment_method = 'cash' THEN amount
+
+                -- accountant gave physical cash to operator
+                WHEN transaction_category = 'bank_to_operator' AND payment_method = 'cash' THEN amount
+
+                -- accountant deposited cash into bank
+                -- stored as negative amount in your current logic
+                WHEN transaction_category = 'bank_deposit' THEN amount
+
+                -- fallback for older plain cash rows
+                WHEN payment_method = 'cash' AND (transaction_category IS NULL OR transaction_category = '') THEN amount
+
+                ELSE 0
+            END
+        ), 0)
+        FROM accountant_ledger
+    ");
 }
 
+
+function getMosqueCashInHand(PDO $pdo): float
+{
+    return getTotalCashInAllOperators($pdo) + getAccountantCashOnHand($pdo);
+}
+
+function getMosqueBankBalance(PDO $pdo): float
+{
+    return getAccountantBankBalance($pdo);
+}
+
+function getMosqueTotalFunds(PDO $pdo): float
+{
+    return getMosqueCashInHand($pdo) + getMosqueBankBalance($pdo);
+}
+
+function getTransferRequestSummary(PDO $pdo): array
+{
+    $operatorsCash = getTotalCashInAllOperators($pdo);
+    $accountantCash = getAccountantCashOnHand($pdo);
+    $cashInHand = $operatorsCash + $accountantCash;
+    $bankBalance = getAccountantBankBalance($pdo);
+
+    return [
+        'operators_cash' => $operatorsCash,
+        'accountant_cash' => $accountantCash,
+        'cash_in_hand' => $cashInHand,
+        'bank_balance' => $bankBalance,
+        'total_funds' => $cashInHand + $bankBalance,
+    ];
+}
 
 function donorDisplayName(array $person): string
 {
@@ -1233,7 +1305,8 @@ function operatorBalance(PDO $pdo, int $userId): float
         return 0.0;
     }
 
-    // FIXED: Only sum transactions that haven't been removed
+    // This sums all collections (+) and all transfers out (-) 
+    // to give the real-time cash currently held by the operator.
     return (float) queryValue($pdo, 
         'SELECT COALESCE(SUM(amount), 0) 
          FROM operator_ledger 
@@ -1242,7 +1315,6 @@ function operatorBalance(PDO $pdo, int $userId): float
         [$userId]
     );
 }
-
 function operatorPendingTransfers(PDO $pdo, int $userId): float
 {
     if (!tableExists($pdo, 'balance_transfers')) return 0.0;
