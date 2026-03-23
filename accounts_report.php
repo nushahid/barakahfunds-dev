@@ -21,7 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cashOnHandNow = getAccountantCashOnHand($pdo);
 
         if ($amount > 0 && $amount <= $cashOnHandNow) {
-            $pdo->prepare('INSERT INTO accountant_ledger (entry_type, amount, payment_method, notes, created_by, created_at) VALUES ("bank_deposit", ?, "bank_transfer", ?, ?, NOW())')
+            $pdo->prepare('
+    INSERT INTO accountant_ledger
+    (entry_type, transaction_type, transaction_category, amount, payment_method, notes, created_by, created_at)
+    VALUES
+    ("bank_deposit", "transfer", "bank_deposit", ?, "bank_transfer", ?, ?, NOW())
+')
                 ->execute([$amount, $notes !== '' ? $notes : 'Cash moved to bank', getLoggedInUserId()]);
             systemLog($pdo, getLoggedInUserId(), 'accountant', 'bank_deposit', 'Bank deposit ' . number_format($amount, 2));
             setFlash('success', 'Cash moved to bank successfully.');

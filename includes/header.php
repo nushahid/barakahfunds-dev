@@ -47,6 +47,7 @@ $menu = [
     ['file' => 'admin_users.php', 'label' => 'Users', 'icon' => '👤', 'roles' => ['admin']],
     ['file' => 'mosque_settings.php', 'label' => 'Settings', 'icon' => '🕌', 'roles' => ['admin']],
     ['file' => 'system_logs.php', 'label' => 'System Logs', 'icon' => '📜', 'roles' => ['admin']],
+    ['file' => 'transaction_approval_requests.php', 'label' => 'Transaction Aproval Requests', 'icon' => '📜', 'roles' => ['accountant']],
 
     // 👤 User
     ['file' => 'my_profile.php', 'label' => 'My Profile', 'icon' => '🙍', 'roles' => ['operator','accountant','admin']],

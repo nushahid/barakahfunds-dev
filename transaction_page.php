@@ -602,62 +602,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
                 : randomToken(8);
 
             $finalNotes = trim(implode(' | ', array_filter(array_merge($descriptionBits, [$notes]))));
+            $requiresApproval = function_exists('transactionRequiresAccountantApproval')
+                ? transactionRequiresAccountantApproval($paymentMethod)
+                : in_array($paymentMethod, ['bank', 'pos', 'stripe', 'online'], true);
+            $settlementStatus = function_exists('transactionInitialSettlementStatus')
+                ? transactionInitialSettlementStatus($paymentMethod)
+                : ($requiresApproval ? 'pending' : 'accepted');
 
-            $hasSourceColumns = function_exists('columnExists')
-                && columnExists($pdo, 'operator_ledger', 'source_type')
-                && columnExists($pdo, 'operator_ledger', 'contributor_count')
-                && columnExists($pdo, 'operator_ledger', 'source_note');
+            $insertColumns = [
+                'operator_id',
+                'person_id',
+                'transaction_type',
+                'transaction_category',
+                'amount',
+                'payment_method',
+                'settlement_status',
+                'reference_id',
+                'invoice_no',
+                'receipt_token',
+                'notes',
+            ];
+            $insertValues = [
+                $uid,
+                $selectedDonorId,
+                $ledgerTransactionType,
+                $ledgerCategory,
+                $amount,
+                $paymentMethod,
+                $settlementStatus,
+                $referenceId,
+                $invoiceNo,
+                $receiptToken,
+                $finalNotes,
+            ];
 
-            if ($hasSourceColumns) {
-                $sourceType = $isCollectedForOthers ? 'group_collected' : 'self';
-
-                $ledgerStmt = $pdo->prepare('
-                    INSERT INTO operator_ledger
-                    (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, source_type, contributor_count, source_note, created_by, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ');
-                $ledgerStmt->execute([
-                    $uid,
-                    $selectedDonorId,
-                    $ledgerTransactionType,
-                    $ledgerCategory,
-                    $amount,
-                    $paymentMethod,
-                    'pending',
-                    $referenceId,
-                    $invoiceNo,
-                    $receiptToken,
-                    $finalNotes,
-                    $sourceType,
-                    $isCollectedForOthers && $contributorCount > 0 ? $contributorCount : null,
-                    $isCollectedForOthers && $sourceNote !== '' ? $sourceNote : null,
-                    $uid,
-                    $createdAt
-                ]);
-            } else {
-                $ledgerStmt = $pdo->prepare('
-                    INSERT INTO operator_ledger
-                    (operator_id, person_id, transaction_type, transaction_category, amount, payment_method, settlement_status, reference_id, invoice_no, receipt_token, notes, created_by, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ');
-                $ledgerStmt->execute([
-                    $uid,
-                    $selectedDonorId,
-                    $ledgerTransactionType,
-                    $ledgerCategory,
-                    $amount,
-                    $paymentMethod,
-                    'pending',
-                    $referenceId,
-                    $invoiceNo,
-                    $receiptToken,
-                    $finalNotes,
-                    $uid,
-                    $createdAt
-                ]);
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'source_type')) {
+                $insertColumns[] = 'source_type';
+                $insertValues[] = $isCollectedForOthers ? 'group_collected' : 'self';
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'contributor_count')) {
+                $insertColumns[] = 'contributor_count';
+                $insertValues[] = $isCollectedForOthers && $contributorCount > 0 ? $contributorCount : null;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'source_note')) {
+                $insertColumns[] = 'source_note';
+                $insertValues[] = $isCollectedForOthers && $sourceNote !== '' ? $sourceNote : null;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'is_removed')) {
+                $insertColumns[] = 'is_removed';
+                $insertValues[] = $requiresApproval ? 1 : 0;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'removed_at')) {
+                $insertColumns[] = 'removed_at';
+                $insertValues[] = $requiresApproval ? $createdAt : null;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'removed_by')) {
+                $insertColumns[] = 'removed_by';
+                $insertValues[] = $requiresApproval ? $uid : null;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'removed_reason')) {
+                $insertColumns[] = 'removed_reason';
+                $insertValues[] = $requiresApproval ? 'Pending accountant approval for ' . $paymentMethod . ' payment' : null;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'created_by')) {
+                $insertColumns[] = 'created_by';
+                $insertValues[] = $uid;
+            }
+            if (function_exists('columnExists') && columnExists($pdo, 'operator_ledger', 'created_at')) {
+                $insertColumns[] = 'created_at';
+                $insertValues[] = $createdAt;
             }
 
+            $placeholders = implode(', ', array_fill(0, count($insertColumns), '?'));
+
+            
+            $ledgerStmt = $pdo->prepare('
+                INSERT INTO operator_ledger (' . implode(', ', $insertColumns) . ')
+                VALUES (' . $placeholders . ')
+            ');
+            $ledgerStmt->execute($insertValues);
+
             $ledgerId = (int)$pdo->lastInsertId();
+
+            if ($requiresApproval && function_exists('queueTransactionApprovalRequest')) {
+                queueTransactionApprovalRequest($pdo, $ledgerId, $uid, $paymentMethod);
+            }
 
             if (function_exists('receiptVerificationToken')) {
                 $pdo->prepare('UPDATE operator_ledger SET receipt_token = ? WHERE ID = ?')
@@ -691,7 +720,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
             $pdo->commit();
 
             if (function_exists('setFlash')) {
-                setFlash('success', 'Donation saved successfully.');
+                setFlash('success', $requiresApproval ? 'Donation saved and sent to accountant for approval.' : 'Donation saved successfully.');
             }
 
             $profileUrl = 'person_profile.php?id=' . $selectedDonorId;

@@ -511,6 +511,79 @@ function normalizePaymentMethod(string $method): string
     };
 }
 
+
+function transactionRequiresAccountantApproval(string $paymentMethod): bool
+{
+    return in_array($paymentMethod, ['bank', 'pos', 'stripe', 'online'], true);
+}
+
+function transactionInitialSettlementStatus(string $paymentMethod): string
+{
+    return transactionRequiresAccountantApproval($paymentMethod) ? 'pending' : 'accepted';
+}
+
+function normalizeAccountantCollectionMethod(string $paymentMethod): string
+{
+    return match ($paymentMethod) {
+        'bank' => 'bank_transfer',
+        'stripe', 'online' => 'online',
+        'pos' => 'pos',
+        default => $paymentMethod,
+    };
+}
+
+function queueTransactionApprovalRequest(PDO $pdo, int $ledgerId, int $requestedBy, string $paymentMethod, string $transactionType = 'collection'): void
+{
+    if ($ledgerId <= 0 || !tableExists($pdo, 'transaction_approval_requests')) {
+        return;
+    }
+
+    $hasTransactionType = function_exists('columnExists')
+        && columnExists($pdo, 'transaction_approval_requests', 'transaction_type');
+
+    $existing = $pdo->prepare('SELECT ID FROM transaction_approval_requests WHERE ledger_id = ? LIMIT 1');
+    $existing->execute([$ledgerId]);
+    $exists = $existing->fetchColumn();
+
+    if ($exists) {
+        if ($hasTransactionType) {
+            $stmt = $pdo->prepare('
+                UPDATE transaction_approval_requests
+                SET requested_by = ?, payment_method = ?, transaction_type = ?, status = "pending",
+                    accountant_id = NULL, accountant_reason = NULL, reviewed_at = NULL
+                WHERE ledger_id = ?
+            ');
+            $stmt->execute([$requestedBy, $paymentMethod, $transactionType, $ledgerId]);
+        } else {
+            $stmt = $pdo->prepare('
+                UPDATE transaction_approval_requests
+                SET requested_by = ?, payment_method = ?, status = "pending",
+                    accountant_id = NULL, accountant_reason = NULL, reviewed_at = NULL
+                WHERE ledger_id = ?
+            ');
+            $stmt->execute([$requestedBy, $paymentMethod, $ledgerId]);
+        }
+        return;
+    }
+
+    if ($hasTransactionType) {
+        $stmt = $pdo->prepare('
+            INSERT INTO transaction_approval_requests
+            (ledger_id, requested_by, payment_method, transaction_type, status, requested_at)
+            VALUES (?, ?, ?, ?, "pending", NOW())
+        ');
+        $stmt->execute([$ledgerId, $requestedBy, $paymentMethod, $transactionType]);
+    } else {
+        $stmt = $pdo->prepare('
+            INSERT INTO transaction_approval_requests
+            (ledger_id, requested_by, payment_method, status, requested_at)
+            VALUES (?, ?, ?, "pending", NOW())
+        ');
+        $stmt->execute([$ledgerId, $requestedBy, $paymentMethod]);
+    }
+}
+
+
 function currentMonthStart(): string { return date('Y-m-01 00:00:00'); }
 function nextMonthStart(): string { return date('Y-m-01 00:00:00', strtotime('+1 month')); }
 function previousMonthStart(): string { return date('Y-m-01 00:00:00', strtotime('-1 month')); }
@@ -1046,8 +1119,12 @@ function getTotalCashInAllOperators(PDO $pdo): float
         return 0.0;
     }
 
-    // ADDED: AND COALESCE(is_removed, 0) = 0
-    return (float) queryValue($pdo, 'SELECT COALESCE(SUM(amount),0) FROM operator_ledger WHERE COALESCE(is_removed, 0) = 0');
+    return (float) queryValue($pdo, '
+        SELECT COALESCE(SUM(amount),0)
+        FROM operator_ledger
+        WHERE COALESCE(is_removed, 0) = 0
+          AND (payment_method = "cash" OR payment_method IS NULL OR payment_method = "")
+    ');
 }
 
 function allOperatorsCashInHand(PDO $pdo): float
@@ -1305,13 +1382,12 @@ function operatorBalance(PDO $pdo, int $userId): float
         return 0.0;
     }
 
-    // This sums all collections (+) and all transfers out (-) 
-    // to give the real-time cash currently held by the operator.
-    return (float) queryValue($pdo, 
-        'SELECT COALESCE(SUM(amount), 0) 
-         FROM operator_ledger 
-         WHERE operator_id = ? 
-           AND COALESCE(is_removed, 0) = 0', 
+    return (float) queryValue($pdo,
+        'SELECT COALESCE(SUM(amount), 0)
+         FROM operator_ledger
+         WHERE operator_id = ?
+           AND COALESCE(is_removed, 0) = 0
+           AND (payment_method = "cash" OR payment_method IS NULL OR payment_method = "")',
         [$userId]
     );
 }

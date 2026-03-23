@@ -8,7 +8,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   verifyCsrfOrFail();
   $amount = (float)($_POST['amount'] ?? 0); $notes = trim((string)($_POST['notes'] ?? '')); $sign = trim((string)($_POST['management_sign'] ?? ''));
   if ($amount == 0.0) $errors[] = 'Amount is required.'; if ($sign === '') $errors[] = 'Management sign / approval is required.';
-  if (!$errors) { $pdo->prepare('INSERT INTO accountant_adjustments (amount, notes, management_sign, status, created_by, created_at) VALUES (?, ?, ?, "approved", ?, NOW())')->execute([$amount,$notes,$sign,$uid]); $adjId = (int)$pdo->lastInsertId(); $pdo->prepare('INSERT INTO accountant_ledger (entry_type, amount, payment_method, notes, created_by, created_at) VALUES ("adjustment", ?, "adjustment", ?, ?, NOW())')->execute([$amount,'Adjustment #'.$adjId.' / '.$notes,$uid]); systemLog($pdo,$uid,'adjustment','create','Adjustment '.number_format($amount,2),$adjId); setFlash('success','Adjustment posted.'); header('Location: payment_adjustments.php'); exit; }
+  if (!$errors) { $pdo->prepare('INSERT INTO accountant_adjustments (amount, notes, management_sign, status, created_by, created_at) VALUES (?, ?, ?, "approved", ?, NOW())')->execute([$amount,$notes,$sign,$uid]); $adjId = (int)$pdo->lastInsertId(); $pdo->prepare('
+    INSERT INTO accountant_ledger
+    (entry_type, transaction_type, transaction_category, amount, payment_method, notes, created_by, created_at)
+    VALUES
+    ("adjustment", "adjustment", "manual_adjustment", ?, "adjustment", ?, ?, NOW())
+')->execute([
+    $amount,
+    'Adjustment #' . $adjId . ' / ' . $notes,
+    $uid
+]); systemLog($pdo,$uid,'adjustment','create','Adjustment '.number_format($amount,2),$adjId); setFlash('success','Adjustment posted.'); header('Location: payment_adjustments.php'); exit; }
 }
 $rows = tableExists($pdo,'accountant_adjustments') ? $pdo->query('SELECT * FROM accountant_adjustments ORDER BY ID DESC LIMIT 50')->fetchAll() : [];
 require_once __DIR__ . '/includes/header.php';

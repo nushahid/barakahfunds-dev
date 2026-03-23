@@ -62,19 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['form_action'] ?? '
 
         if (tableExists($pdo, 'accountant_ledger')) {
             $stmt = $pdo->prepare('
-                INSERT INTO accountant_ledger
-                    (entry_type, amount, payment_method, notes, created_by, created_at)
-                VALUES
-                    (?, ?, ?, ?, ?, ?)
-            ');
-            $stmt->execute([
-                'expense',
-                -1 * $amount,
-                $paymentMethod,
-                $finalNotes,
-                $uid,
-                $expenseDate . ' 12:00:00'
-            ]);
+    INSERT INTO accountant_ledger
+    (entry_type, transaction_type, transaction_category, amount, payment_method, notes, created_by, created_at)
+    VALUES
+    ("expense", "expense", "expense", ?, ?, ?, ?, NOW())
+')->execute([
+    $amount,
+    $paymentMethod,
+    $notes,
+    $uid
+]);
         }
 
         setFlash('success', 'Mosque account expense saved successfully.');

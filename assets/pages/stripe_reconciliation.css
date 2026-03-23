@@ -1,2 +1,57 @@
 body.page-stripe-reconciliation .stripe-helper-gap{margin-bottom:16px}
 body.page-stripe-reconciliation .stripe-align-end{align-self:end}
+body.page-stripe-reconciliation .stripe-bulk-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+}
+
+body.page-stripe-reconciliation .stripe-summary{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:12px;
+    margin-bottom:16px;
+}
+
+body.page-stripe-reconciliation .stripe-summary-card{
+    padding:14px;
+    border:1px solid #e5e7eb;
+    border-radius:10px;
+    background:#fafafa;
+}
+
+body.page-stripe-reconciliation .row-accepted{
+    background:#f0fdf4;
+}
+
+body.page-stripe-reconciliation .row-rejected{
+    background:#fef2f2;
+}
+
+body.page-stripe-reconciliation .row-skipped{
+    background:#f8fafc;
+}
+
+body.page-stripe-reconciliation .stripe-decision-cell{
+    white-space:nowrap;
+}
+
+body.page-stripe-reconciliation .stripe-decision-cell label{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    margin-right:10px;
+}
+
+body.page-stripe-reconciliation .stripe-sticky-actions{
+    position:sticky;
+    bottom:0;
+    background:#fff;
+    border-top:1px solid #e5e7eb;
+    padding:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+}
